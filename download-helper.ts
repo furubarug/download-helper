@@ -1,18 +1,22 @@
 /**
  * ダウンロード対象Objectの型
  */
-type DownloadObj = { posts: Record<string, PostObj>, postCount: number, fileCount: number, id: string };
+export type DownloadObj = { posts: Record<string, PostObj>, postCount: number, fileCount: number, id: string };
 
 /**
  * 投稿情報のObject
  */
-type PostObj = Readonly<{ info: string, items: DlInfo[], html: string, cover?: DlInfo }>;
+export type PostObj = Readonly<{ info: string, items: DlInfo[], html: string, cover?: DlInfo }>;
 
 /**
  * ダウンロード用の情報
  */
-type DlInfo = { url: string, filename: string };
+export type DlInfo = { url: string, filename: string };
 
+/**
+ * ダウンロード用のヘルパー
+ * 適当にオーバーライドして使うことを想定
+ */
 export class DownloadHelper {
     /**
      * bootstrapのCSS情報
