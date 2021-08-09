@@ -6,5 +6,5 @@
 
 ```bash
 # yarn add git+https://github.com/furubarug/download-helper.git
-npm install git+https://github.com/furubarug/download-helper.git
+npm install --save git+https://github.com/furubarug/download-helper.git
 ```
