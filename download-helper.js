@@ -107,14 +107,13 @@ export class DownloadHelper {
                 for (const [title, post] of Object.entries(downloadObj.posts)) {
                     if (!post)
                         continue;
-                    const path = `${id}/${title}`;
-                    enqueue([post.info], [path, 'info.txt']);
-                    enqueue([ui.createHtmlFromBody(title, post.html)], [path, 'index.html']);
+                    enqueue([post.info], [id, title, 'info.txt']);
+                    enqueue([ui.createHtmlFromBody(title, post.html)], [id, title, 'index.html']);
                     if (post.cover) {
                         log(`download ${post.cover.filename}`);
                         const blob = await ui.download(post.cover, 1);
                         if (blob) {
-                            enqueue([blob], [path, post.cover.filename]);
+                            enqueue([blob], [id, title, post.cover.filename]);
                         }
                     }
                     let i = 1, l = post.items.length;
@@ -122,7 +121,7 @@ export class DownloadHelper {
                         log(`download ${dl.filename} (${i++}/${l})`);
                         const blob = await ui.download(dl, 1);
                         if (blob) {
-                            enqueue([blob], [path, dl.filename]);
+                            enqueue([blob], [id, title, dl.filename]);
                         }
                         else {
                             console.error(`${dl.filename}(${dl.url})のダウンロードに失敗、読み飛ばすよ`);

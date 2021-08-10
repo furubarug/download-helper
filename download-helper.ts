@@ -155,16 +155,15 @@ export class DownloadHelper {
 
                 for (const [title, post] of Object.entries(downloadObj.posts)) {
                     if (!post) continue;
-                    const path = `${id}/${title}`
                     // 投稿情報+html
-                    enqueue([post.info], [path, 'info.txt']);
-                    enqueue([ui.createHtmlFromBody(title, post.html)], [path, 'index.html']);
+                    enqueue([post.info], [id, title, 'info.txt']);
+                    enqueue([ui.createHtmlFromBody(title, post.html)], [id, title, 'index.html']);
                     // カバー画像
                     if (post.cover) {
                         log(`download ${post.cover.filename}`);
                         const blob = await ui.download(post.cover, 1);
                         if (blob) {
-                            enqueue([blob], [path, post.cover.filename]);
+                            enqueue([blob], [id, title, post.cover.filename]);
                         }
                     }
                     // ファイル処理
@@ -173,7 +172,7 @@ export class DownloadHelper {
                         log(`download ${dl.filename} (${i++}/${l})`);
                         const blob = await ui.download(dl, 1);
                         if (blob) {
-                            enqueue([blob], [path, dl.filename]);
+                            enqueue([blob], [id, title, dl.filename]);
                         } else {
                             console.error(`${dl.filename}(${dl.url})のダウンロードに失敗、読み飛ばすよ`);
                             log(`${dl.filename}のダウンロードに失敗`);
