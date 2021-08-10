@@ -148,23 +148,23 @@ export class DownloadHelper {
         const readableZipStream = new createWriter({
             async pull(ctrl: any) {
                 let count = 0;
-                const enqueue = (fileBits: BlobPart[], path: string) => ctrl.enqueue(new File(fileBits, ui.encodePath(path)));
+                const enqueue = (fileBits: BlobPart[], paths: string[]) => ctrl.enqueue(new File(fileBits, ui.encodePath(...paths)));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
                 // ルートhtml
-                enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], `${id}/index.html`);
+                enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], [id, 'index.html']);
 
                 for (const [title, post] of Object.entries(downloadObj.posts)) {
                     if (!post) continue;
                     const path = `${id}/${title}`
                     // 投稿情報+html
-                    enqueue([post.info], `${path}/info.txt`);
-                    enqueue([ui.createHtmlFromBody(title, post.html)], `${path}/index.html`);
+                    enqueue([post.info], [path, 'info.txt']);
+                    enqueue([ui.createHtmlFromBody(title, post.html)], [path, 'index.html']);
                     // カバー画像
                     if (post.cover) {
                         log(`download ${post.cover.filename}`);
                         const blob = await ui.download(post.cover, 1);
                         if (blob) {
-                            enqueue([blob], `${path}/${post.cover.filename}`);
+                            enqueue([blob], [path, post.cover.filename]);
                         }
                     }
                     // ファイル処理
@@ -173,7 +173,7 @@ export class DownloadHelper {
                         log(`download ${dl.filename} (${i++}/${l})`);
                         const blob = await ui.download(dl, 1);
                         if (blob) {
-                            enqueue([blob], `${path}/${dl.filename}`);
+                            enqueue([blob], [path, dl.filename]);
                         } else {
                             console.error(`${dl.filename}(${dl.url})のダウンロードに失敗、読み飛ばすよ`);
                             log(`${dl.filename}のダウンロードに失敗`);
@@ -264,18 +264,18 @@ export class DownloadHelper {
 
     /**
      * ファイルパスのエンコード
-     * @param path ファイルのパス
+     * @param pathPart ファイルのパス
      */
-    encodePath(path: string): string {
-        return path.split('/').map(it => this.encodeFileName(it)).join('/');
+    encodePath(...pathPart: string[]): string {
+        return pathPart.map(it => this.encodeFileName(it)).join('/');
     }
 
     /**
      * URIのエンコード
-     * @param path ファイルのパス
+     * @param pathPart ファイルのパス
      */
-    encodeLink(path: string): string {
-        return path.split('/').map(it =>
+    encodeLink(...pathPart: string[]): string {
+        return pathPart.map(it =>
             this.encodeFileName(it).replaceAll(/[;,/?:@&=+$#]/g, encodeURIComponent)
         ).join('/');
     }
@@ -359,7 +359,7 @@ export class DownloadHelper {
     createRootHtmlFromPosts(posts: Record<string, PostObj>): string {
         return Object.entries(posts).map(([title, post]) => {
             const escapedTitle = this.encodeFileName(title);
-            return `<a class="hl" href="${this.encodeLink(`./${escapedTitle}/index.html`)}"><div class="root card">\n` +
+            return `<a class="hl" href="${this.encodeLink('.', escapedTitle, 'index.html')}"><div class="root card">\n` +
                 this.createCoverHtmlFromPost(escapedTitle, post) +
                 `<div class="card-body"><h5 class="card-title">${title}</h5></div>\n</div></a><br>\n`
         }).join('\n');
@@ -373,12 +373,12 @@ export class DownloadHelper {
      */
     createCoverHtmlFromPost(escapedTitle: string, post: PostObj): string {
         if (post.cover) {
-            return `<img class="card-img-top gray-card" src="${this.encodeLink(`./${escapedTitle}/${post.cover.filename}`)}"/>\n`;
+            return `<img class="card-img-top gray-card" src="${this.encodeLink('.', escapedTitle, post.cover.filename)}"/>\n`;
         } else if (post.items.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
                 '\n<div class="carousel-item active">' + post.items.map(it =>
                     '<div class="d-flex justify-content-center gray-carousel">' +
-                    `<img src="${this.encodeLink(`./${escapedTitle}/${it.filename}`)}" class="d-block pd-carousel" height="180px"/></div>`
+                    `<img src="${this.encodeLink('.', escapedTitle, it.filename)}" class="d-block pd-carousel" height="180px"/></div>`
                 ).join('</div>\n<div class="carousel-item">') + '</div>\n</div></div>\n';
         } else {
             return `<img class="card-img-top gray-card" />\n`;
