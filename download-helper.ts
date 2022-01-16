@@ -366,6 +366,29 @@ export class DownloadHelper {
         };
         progressDiv.appendChild(progress);
         bodyDiv.appendChild(progressDiv);
+        let infoDiv = document.createElement("div");
+        infoDiv.style.width = "350px";
+        let checkBoxDiv = document.createElement("div");
+        checkBoxDiv.className = "form-check float-start";
+        let checkBox = document.createElement("input");
+        checkBox.className = "form-check-input";
+        checkBox.type = "checkbox";
+        checkBox.id = "LogCheck";
+        checkBox.checked = true;
+        checkBoxDiv.appendChild(checkBox);
+        let checkBoxLabel = document.createElement("label");
+        checkBoxLabel.className = "form-check-label";
+        // @ts-ignore
+        checkBoxLabel["for"] = "LogCheck";
+        checkBoxLabel.innerText = "ログを自動スクロール";
+        checkBoxDiv.appendChild(checkBoxLabel);
+        infoDiv.appendChild(checkBoxDiv);
+        let remainTimeDiv = document.createElement("div");
+        remainTimeDiv.className = "float-end";
+        remainTimeDiv.innerText = "残りおよそ -:--";
+        const setRemainTime = (r: string) => remainTimeDiv.innerText = `残りおよそ ${r}`;
+        infoDiv.appendChild(remainTimeDiv);
+        bodyDiv.appendChild(infoDiv);
         let textarea = document.createElement("textarea");
         textarea.className = "form-control";
         textarea.readOnly = true;
@@ -374,7 +397,9 @@ export class DownloadHelper {
         textarea.style.height = "80px";
         const textLog = (t: string) => {
             textarea.value += `${t}\n`;
-            textarea.scrollTop = textarea.scrollHeight;
+            if (checkBox.checked) {
+                textarea.scrollTop = textarea.scrollHeight;
+            }
         };
         bodyDiv.appendChild(textarea);
         document.body.appendChild(bodyDiv);
@@ -390,7 +415,7 @@ export class DownloadHelper {
         button.onclick = function () {
             button.disabled = true;
             window.addEventListener('beforeunload', loadingFun);
-            downloadFun(JSON.parse(input.value), setProgress, textLog)
+            downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime)
                 .then(() => window.removeEventListener("beforeunload", loadingFun))
                 .catch((e) => {
                     textLog('エラー出た');
@@ -405,8 +430,9 @@ export class DownloadHelper {
      * @param downloadObj ダウンロード対象オブジェクト
      * @param progress 進捗率出力関数
      * @param log ログ出力関数
+     * @param remainTime 終了予測出力関数
      */
-    async downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void) {
+    async downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void, remainTime: (r: string) => void) {
         if (!this.isDownloadJsonObj(downloadObj)) throw new Error('ダウンロード対象オブジェクトの型が不正');
         await this.script('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
         await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
@@ -420,6 +446,7 @@ export class DownloadHelper {
         // @ts-ignore
         const readableZipStream = new createWriter({
             async pull(ctrl: any) {
+                const startTime = new Date().getTime();
                 let count = 0;
                 const enqueue = (fileBits: BlobPart[], path: string) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
@@ -452,7 +479,13 @@ export class DownloadHelper {
                             log(`${file.encodedName}のダウンロードに失敗`);
                         }
                         count++;
-                        setTimeout(() => progress(count * 100 / downloadObj.fileCount | 0), 0);
+                        setTimeout(() => {
+                            const remain = Math.abs(new Date().getTime() - startTime) * (downloadObj.fileCount - count) / count;
+                            const h = remain / (60 * 60 * 1000) | 0;
+                            const m = (remain - 60 * 60 * 1000 * h) / (60 * 1000) | 0;
+                            remainTime(`${h}:${('00' + m).slice(-2)}`);
+                            progress(count * 100 / downloadObj.fileCount | 0);
+                        }, 0);
                         await ui.sleep(100);
                     }
                 }
