@@ -124,7 +124,12 @@ export class DownloadHelper {
             button.disabled = true;
             window.addEventListener('beforeunload', loadingFun);
             downloadFun(JSON.parse(input.value), setProgress, textLog)
-                .then(() => window.removeEventListener("beforeunload", loadingFun));
+                .then(() => window.removeEventListener("beforeunload", loadingFun))
+                .catch((e) => {
+                    textLog('エラー出た');
+                    textLog(JSON.stringify(e));
+                    window.removeEventListener("beforeunload", loadingFun);
+                });
         };
     }
 
