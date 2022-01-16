@@ -183,7 +183,7 @@ export class DownloadHelper {
                             log(`${dl.filename}のダウンロードに失敗`);
                         }
                         count++;
-                        await setTimeout(() => progress(count * 100 / downloadObj.fileCount | 0), 0);
+                        setTimeout(() => progress(count * 100 / downloadObj.fileCount | 0), 0);
                         await ui.sleep(100);
                     }
                     log(`${count * 100 / downloadObj.fileCount | 0}% (${count}/${downloadObj.fileCount})`);
@@ -263,7 +263,8 @@ export class DownloadHelper {
             .replace(/"/g, "“")
             .replace(/</g, "＜")
             .replace(/>/g, "＞")
-            .replace(/\|/g, "｜");
+            .replace(/\|/g, "｜")
+            .trimEnd();
     }
 
     /**
