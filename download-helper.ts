@@ -1,23 +1,285 @@
 /**
- * ダウンロード対象Objectの型
+ * ダウンロード用のObject
  */
-export type DownloadObj = { posts: Record<string, PostObj>, postCount: number, fileCount: number, id: string };
+export type DownloadObj = { posts: Record<string, PostObj[]>, id: string };
 
 /**
  * 投稿情報のObject
  */
-export type PostObj = Readonly<{ info: string, items: DlInfo[], html: string, cover?: DlInfo }>;
+export type PostObj = { name: string, info: string, files: Record<string, FileObj[]>, html: string, cover?: FileObj };
 
 /**
- * ダウンロード用の情報
+ * ファイル用のObject
  */
-export type DlInfo = { url: string, filename: string };
+export type FileObj = { url: string, name: string };
+
+/**
+ * ダウンロード用JSON元オブジェクト
+ */
+export type DownloadJsonObj = {
+    posts: {
+        originalName: string,
+        encodedName: string,
+        informationText: string,
+        htmlText: string,
+        files: { url: string, originalName: string, encodedName: string }[],
+        cover?: { url: string, name: string }
+    }[];
+    id: string;
+    fileCount: number;
+    postCount: number;
+};
+
+/**
+ * ダウンロード用のUtilityクラス
+ */
+export class DownloadUtils {
+    /**
+     * 保存するファイル名のエンコード
+     * 主にwindowsで使えないファイル名のエスケープ処理をする
+     * @param name ファイル名
+     */
+    encodeFileName(name: string): string {
+        return name
+            .replace(/\//g, "／")
+            .replace(/\\/g, "＼")
+            .replace(/,/g, "，")
+            .replace(/:/g, "：")
+            .replace(/\*/g, "＊")
+            .replace(/"/g, "“")
+            .replace(/</g, "＜")
+            .replace(/>/g, "＞")
+            .replace(/\|/g, "｜")
+            .trimEnd();
+    }
+
+    /**
+     * URIのエンコード
+     * @param name ファイル名
+     */
+    encodeURI(name: string): string {
+        return this.encodeFileName(name).replaceAll(/[;,/?:@&=+$#]/g, encodeURIComponent)
+    }
+
+    /**
+     * 拡張子の分割
+     * @param name ファイル名
+     */
+    splitExt(name: string): string[] {
+        return name.split(/(?=\.[^.]+$)/);
+    }
+
+    /**
+     * 同一名の設定
+     * @param name 名
+     * @param index インデックス
+     */
+    getFileName(name: string, index: number): string {
+        const split = this.splitExt(name);
+        if (split.length == 1) {
+            return `${index}${split[0]}`;
+        } else if (split.length == 2) {
+            return `${split[0]}_${index}${split[1]}`;
+        } else {
+            throw new Error(`unexpected name: ${name}`);
+        }
+    }
+}
+
+/**
+ * ダウンロード用のオブジェクトラッパークラス
+ */
+export class DownloadObject {
+    private readonly downloadObj: DownloadObj;
+    private readonly utils: DownloadUtils;
+    private readonly orderedPosts: PostObject[] = [];
+
+    constructor(id: string, utils: DownloadUtils) {
+        this.downloadObj = {posts: {}, id};
+        this.utils = utils;
+    }
+
+    stringify(): string {
+        const downloadJson: DownloadJsonObj = {
+            posts: this.orderedPosts.map(it => it.toJsonObjBy(this.downloadObj.posts)),
+            id: this.downloadObj.id,
+            postCount: this.countPost(),
+            fileCount: this.countFile()
+        };
+        return JSON.stringify(downloadJson);
+    }
+
+    addPost(name: string): PostObject {
+        const encodedName = this.utils.encodeFileName(name);
+        if (this.downloadObj.posts[encodedName] === undefined) {
+            this.downloadObj.posts[encodedName] = [];
+        }
+        const postObj: PostObj = {name, info: '', files: {}, html: ''};
+        this.downloadObj.posts[encodedName].push(postObj);
+        const postObject = new PostObject(postObj, this.utils);
+        this.orderedPosts.push(postObject);
+        return postObject;
+    }
+
+    private countPost(): number {
+        return Object.values(this.downloadObj.posts).reduce((s, posts) => s + posts.length, 0);
+    }
+
+    private countFile(): number {
+        return Object.values(this.downloadObj.posts).reduce((allFileSize, posts) =>
+                allFileSize + posts.reduce((postFileSize, post) =>
+                        postFileSize + Object.values(post.files).reduce((s, files) =>
+                            s + files.length, 0
+                        ), 0
+                ), 0
+        );
+    }
+}
+
+/**
+ * 投稿情報オブジェクトラッパークラス
+ */
+export class PostObject {
+    private readonly postObj: PostObj;
+    private readonly utils: DownloadUtils;
+
+    constructor(postObj: PostObj, utils: DownloadUtils) {
+        this.postObj = postObj;
+        this.utils = utils;
+    }
+
+    setInfo(info: string) {
+        this.postObj.info = info;
+    }
+
+    setHtml(html: string) {
+        this.postObj.html = html;
+    }
+
+    setCover(name: string, url: string): FileObject {
+        const split = this.utils.splitExt(name);
+        const fileName = split.length <= 1 ? name : `cover${split[1]}`;
+        const fileObj: FileObj = {name: fileName, url};
+        this.postObj.cover = fileObj;
+        return new FileObject(fileObj, this.utils);
+    }
+
+    addFile(name: string, url: string): FileObject {
+        const encodedName = this.utils.encodeFileName(name);
+        if (this.postObj.files[encodedName] === undefined) {
+            this.postObj.files[encodedName] = [];
+        }
+        const fileObj: FileObj = {name, url};
+        this.postObj.files[encodedName].push(fileObj);
+        return new FileObject(fileObj, this.utils);
+    }
+
+
+    getImageLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName()}"><div class="post card">\n` +
+            `<img class="card-img-top" src="${filePath}" alt="${fileObject.getOriginalName()}"/>\n</div></a>`;
+    }
+
+    getFileLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<span><a href="${filePath}" download="${fileObject.getEncodedName()}">${fileObject.getOriginalName()}</a></span>`;
+    }
+
+    private getCurrentFilePath(fileObject: FileObject): string {
+        const encodedName = fileObject.getEncodedName();
+        if (fileObject.equals(this.postObj.cover)) {
+            return `./${this.utils.encodeURI(encodedName)}`;
+        }
+        if (this.postObj.files[encodedName] === undefined) {
+            throw new Error(`file object is undefined: ${fileObject.getOriginalName()}`)
+        }
+        const index = this.postObj.files[encodedName].findIndex(it => fileObject.equals(it));
+        if (index < 0) {
+            throw new Error(`file object is not found: ${fileObject.getOriginalName()}`)
+        }
+        const fileName = this.postObj.files[encodedName].length == 1 ? encodedName : this.utils.getFileName(encodedName, index + 1);
+        return `./${this.utils.encodeURI(fileName)}`;
+    }
+
+    toJsonObjBy(posts: Record<string, PostObj[]>): DownloadJsonObj['posts'][number] {
+        const key = this.utils.encodeFileName(this.postObj.name);
+        const postIndex = posts[key]?.indexOf(this.postObj);
+        if (postIndex === undefined || postIndex < 0) {
+            throw new Error(`post object is not found: ${this.postObj.name}`);
+        }
+        const encodedName = posts[key].length == 1 ? key : this.utils.getFileName(key, postIndex + 1);
+        return {
+            originalName: this.postObj.name,
+            encodedName,
+            informationText: this.postObj.info,
+            htmlText: this.postObj.html,
+            files: this.collectFiles(),
+            cover: this.postObj.cover
+        };
+    }
+
+    private collectFiles(): DownloadJsonObj['posts'][number]['files'] {
+        // 順序自由
+        const ret: DownloadJsonObj['posts'][number]['files'] = [];
+        for (const [key, fileObjArray] of Object.entries(this.postObj.files)) {
+            let fileIndex = 0;
+            for (const fileObj of fileObjArray) {
+                fileIndex++;
+                const encodedName = fileObjArray.length == 1 ? key : this.utils.getFileName(key, fileIndex);
+                ret.push({
+                    url: fileObj.url,
+                    originalName: fileObj.name,
+                    encodedName
+                });
+            }
+        }
+        return ret;
+    }
+}
+
+/**
+ * ファイルオブジェクトラッパークラス
+ */
+export class FileObject {
+    private readonly fileObj: FileObj;
+    private readonly utils: DownloadUtils;
+
+    constructor(fileObj: FileObj, utils: DownloadUtils) {
+        this.fileObj = fileObj;
+        this.utils = utils;
+    }
+
+    getEncodedName(): string {
+        return this.utils.encodeFileName(this.fileObj.name);
+    }
+
+    getOriginalName(): string {
+        return this.fileObj.name;
+    }
+
+    getUrl(): string {
+        return this.fileObj.url;
+    }
+
+    equals(obj: any): boolean {
+        if (typeof obj != 'object') {
+            return false;
+        }
+        return obj.name === this.fileObj.name && obj.url === this.fileObj.url;
+    }
+}
 
 /**
  * ダウンロード用のヘルパー
- * 適当にオーバーライドして使うことを想定
  */
 export class DownloadHelper {
+    private readonly utils: DownloadUtils;
+
+    constructor(utils: DownloadUtils) {
+        this.utils = utils;
+    }
+
     /**
      * bootstrapのCSS情報
      */
@@ -33,6 +295,11 @@ export class DownloadHelper {
         src: "https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js",
         integrity: "sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW",
     };
+
+    /**
+     * カバー画像代替対象拡張子
+     */
+    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
 
     /**
      * ダウンロード用のUIを作成する
@@ -99,6 +366,29 @@ export class DownloadHelper {
         };
         progressDiv.appendChild(progress);
         bodyDiv.appendChild(progressDiv);
+        let infoDiv = document.createElement("div");
+        infoDiv.style.width = "350px";
+        let checkBoxDiv = document.createElement("div");
+        checkBoxDiv.className = "form-check float-start";
+        let checkBox = document.createElement("input");
+        checkBox.className = "form-check-input";
+        checkBox.type = "checkbox";
+        checkBox.id = "LogCheck";
+        checkBox.checked = true;
+        checkBoxDiv.appendChild(checkBox);
+        let checkBoxLabel = document.createElement("label");
+        checkBoxLabel.className = "form-check-label";
+        // @ts-ignore
+        checkBoxLabel["for"] = "LogCheck";
+        checkBoxLabel.innerText = "ログを自動スクロール";
+        checkBoxDiv.appendChild(checkBoxLabel);
+        infoDiv.appendChild(checkBoxDiv);
+        let remainTimeDiv = document.createElement("div");
+        remainTimeDiv.className = "float-end";
+        remainTimeDiv.innerText = "残りおよそ -:--";
+        const setRemainTime = (r: string) => remainTimeDiv.innerText = `残りおよそ ${r}`;
+        infoDiv.appendChild(remainTimeDiv);
+        bodyDiv.appendChild(infoDiv);
         let textarea = document.createElement("textarea");
         textarea.className = "form-control";
         textarea.readOnly = true;
@@ -107,7 +397,9 @@ export class DownloadHelper {
         textarea.style.height = "80px";
         const textLog = (t: string) => {
             textarea.value += `${t}\n`;
-            textarea.scrollTop = textarea.scrollHeight;
+            if (checkBox.checked) {
+                textarea.scrollTop = textarea.scrollHeight;
+            }
         };
         bodyDiv.appendChild(textarea);
         document.body.appendChild(bodyDiv);
@@ -123,8 +415,13 @@ export class DownloadHelper {
         button.onclick = function () {
             button.disabled = true;
             window.addEventListener('beforeunload', loadingFun);
-            downloadFun(JSON.parse(input.value), setProgress, textLog)
-                .then(() => window.removeEventListener("beforeunload", loadingFun));
+            downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime)
+                .then(() => window.removeEventListener("beforeunload", loadingFun))
+                .catch((e) => {
+                    textLog('エラー出た');
+                    textLog(JSON.stringify(e));
+                    window.removeEventListener("beforeunload", loadingFun);
+                });
         };
     }
 
@@ -133,55 +430,64 @@ export class DownloadHelper {
      * @param downloadObj ダウンロード対象オブジェクト
      * @param progress 進捗率出力関数
      * @param log ログ出力関数
+     * @param remainTime 終了予測出力関数
      */
-    async downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void) {
-        if (!this.isDownloadObj(downloadObj)) throw new Error('ダウンロード対象オブジェクトの型が不正');
+    async downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void, remainTime: (r: string) => void) {
+        if (!this.isDownloadJsonObj(downloadObj)) throw new Error('ダウンロード対象オブジェクトの型が不正');
         await this.script('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
         await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
         await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
 
         const ui = this;
-        const id = this.encodeFileName(downloadObj.id);
+        const utils = this.utils;
+        const encodedId = utils.encodeFileName(downloadObj.id);
         // @ts-ignore
-        const fileStream = streamSaver.createWriteStream(`${id}.zip`);
+        const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
         // @ts-ignore
         const readableZipStream = new createWriter({
             async pull(ctrl: any) {
+                const startTime = new Date().getTime();
                 let count = 0;
-                const enqueue = (fileBits: BlobPart[], paths: string[]) => ctrl.enqueue(new File(fileBits, ui.encodePath(...paths)));
+                const enqueue = (fileBits: BlobPart[], path: string) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
                 // ルートhtml
-                enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], [id, 'index.html']);
-
-                for (const [title, post] of Object.entries(downloadObj.posts)) {
-                    if (!post) continue;
+                enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], 'index.html');
+                // 投稿処理
+                let postCount = 0;
+                for (const post of downloadObj.posts) {
+                    log(`${post.originalName} (${postCount++}/${downloadObj.postCount})`);
                     // 投稿情報+html
-                    enqueue([post.info], [id, title, 'info.txt']);
-                    enqueue([ui.createHtmlFromBody(title, post.html)], [id, title, 'index.html']);
+                    enqueue([post.informationText], `${post.encodedName}/info.txt`);
+                    enqueue([ui.createHtmlFromBody(post.originalName, post.htmlText)], `${post.encodedName}/index.html`);
                     // カバー画像
                     if (post.cover) {
-                        log(`download ${post.cover.filename}`);
+                        log(`download ${post.cover.name}`);
                         const blob = await ui.download(post.cover, 1);
                         if (blob) {
-                            enqueue([blob], [id, title, post.cover.filename]);
+                            enqueue([blob], `${post.encodedName}/${post.cover.name}`);
                         }
                     }
                     // ファイル処理
-                    let i = 1, l = post.items.length;
-                    for (const dl of post.items) {
-                        log(`download ${dl.filename} (${i++}/${l})`);
-                        const blob = await ui.download(dl, 1);
+                    let fileCount = 0;
+                    for (const file of post.files) {
+                        log(`download ${file.encodedName} (${fileCount++}/${post.files.length})`);
+                        const blob = await ui.download({url: file.url, name: file.encodedName}, 1);
                         if (blob) {
-                            enqueue([blob], [id, title, dl.filename]);
+                            enqueue([blob], `${post.encodedName}/${file.encodedName}`);
                         } else {
-                            console.error(`${dl.filename}(${dl.url})のダウンロードに失敗、読み飛ばすよ`);
-                            log(`${dl.filename}のダウンロードに失敗`);
+                            console.error(`${file.encodedName}(${file.url})のダウンロードに失敗、読み飛ばすよ`);
+                            log(`${file.encodedName}のダウンロードに失敗`);
                         }
                         count++;
-                        await setTimeout(() => progress(count * 100 / downloadObj.fileCount | 0), 0);
+                        setTimeout(() => {
+                            const remain = Math.abs(new Date().getTime() - startTime) * (downloadObj.fileCount - count) / count;
+                            const h = remain / (60 * 60 * 1000) | 0;
+                            const m = (remain - 60 * 60 * 1000 * h) / (60 * 1000) | 0;
+                            remainTime(`${h}:${('00' + m).slice(-2)}`);
+                            progress(count * 100 / downloadObj.fileCount | 0);
+                        }, 0);
                         await ui.sleep(100);
                     }
-                    log(`${count * 100 / downloadObj.fileCount | 0}% (${count}/${downloadObj.fileCount})`);
                 }
                 ctrl.close();
             }
@@ -227,7 +533,7 @@ export class DownloadHelper {
      * @param filename
      * @param limit 回数制限
      */
-    async download({url, filename}: DlInfo, limit: number): Promise<Blob | null> {
+    async download({url, name}: { url: string, name: string }, limit: number): Promise<Blob | null> {
         if (limit < 0) return null;
         try {
             const blob = await fetch(url)
@@ -235,61 +541,22 @@ export class DownloadHelper {
                     throw new Error(e)
                 })
                 .then(r => r.ok ? r.blob() : null);
-            return blob ? blob : await this.download({url, filename}, limit - 1);
+            return blob ? blob : await this.download({url, name}, limit - 1);
         } catch (_) {
-            console.error(`通信エラー: ${filename}, ${url}`);
+            console.error(`通信エラー: ${name}, ${url}`);
             await this.sleep(1000);
-            return await this.download({url, filename}, limit - 1);
+            return await this.download({url, name}, limit - 1);
         }
-    }
-
-    /**
-     * 保存するファイル名のエンコード
-     * 主にwindowsで使えないファイル名のエスケープ処理をする
-     * @param name ファイル名
-     */
-    encodeFileName(name: string): string {
-        return name
-            .replace(/\//g, "／")
-            .replace(/\\/g, "＼")
-            .replace(/,/g, "，")
-            .replace(/:/g, "：")
-            .replace(/\*/g, "＊")
-            .replace(/"/g, "“")
-            .replace(/</g, "＜")
-            .replace(/>/g, "＞")
-            .replace(/\|/g, "｜");
-    }
-
-    /**
-     * ファイルパスのエンコード
-     * @param pathPart ファイルのパス
-     */
-    encodePath(...pathPart: string[]): string {
-        return pathPart.map(it => this.encodeFileName(it)).join('/');
-    }
-
-    /**
-     * URIのエンコード
-     * @param pathPart ファイルのパス
-     */
-    encodeLink(...pathPart: string[]): string {
-        return pathPart.map(it =>
-            this.encodeFileName(it).replaceAll(/[;,/?:@&=+$#]/g, encodeURIComponent)
-        ).join('/');
     }
 
     /**
      * 型検証
      * @param target 検証対象
      */
-    isDownloadObj(target: any): target is DownloadObj {
+    isDownloadJsonObj(target: any): target is DownloadJsonObj {
         switch (true) {
             case typeof target !== 'object':
                 console.error('ダウンロード用オブジェクトの型が不正(対象がobjectでない)', target);
-                return false;
-            case typeof target.posts !== 'object':
-                console.error('ダウンロード用オブジェクトの型が不正(postsがobjectでない)', target.posts);
                 return false;
             case typeof target.postCount !== 'number':
                 console.error('ダウンロード用オブジェクトの型が不正(postCountが数値でない)', target.postCount);
@@ -300,45 +567,48 @@ export class DownloadHelper {
             case typeof target.id !== 'string':
                 console.error('ダウンロード用オブジェクトの型が不正(idが文字列でない)', target.id);
                 return false;
-            case Object.keys(target.posts).some(it => !it):
-                console.error('ダウンロード用オブジェクトの型が不正(postsのキーに空文字が含まれる)', target.posts);
+            case !Array.isArray(target.posts):
+                console.error('ダウンロード用オブジェクトの型が不正(postsが配列でない)', target.posts);
                 return false;
         }
-        return !Object.values(target.posts).some((it: any) => {
+        return target.posts.some((it: any) => {
             switch (true) {
                 case typeof it !== 'object':
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にobjectでないものが含まれる)', it, target.posts);
                     return true;
-                case typeof it.info !== 'string':
-                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にinfoが文字列でないものが含まれる)', it.info, target.posts);
+                case typeof it.informationText !== 'string':
+                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にinformationTextが文字列でないものが含まれる)', it.informationText, target.posts);
                     return true;
-                case typeof it.html !== 'string':
-                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にhtmlが文字列でないものが含まれる)', it.html, target.posts);
+                case typeof it.htmlText !== 'string':
+                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にhtmlTextが文字列でないものが含まれる)', it.htmlText, target.posts);
                     return true;
-                case  !Array.isArray(it.items):
-                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にitemsが配列でないものが含まれる)', it.items, target.posts);
+                case  !Array.isArray(it.files):
+                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にfilesが配列でないものが含まれる)', it.files, target.posts);
                     return true;
-                case it.items.some((d: any) => {
+                case it.files.some((f: any) => {
                     switch (true) {
-                        case typeof d !== 'object':
-                            console.error('ダウンロード用オブジェクトの型が不正(postsのitemsの値にオブジェクトでないものが含まれる)', d, it.items);
+                        case typeof f !== 'object':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのfilesの値にオブジェクトでないものが含まれる)', f, it.files);
                             return true;
-                        case typeof d.url !== 'string':
-                            console.error('ダウンロード用オブジェクトの型が不正(postsのitemsの値にurlが文字列でないものが含まれる)', d.url, it.items);
+                        case typeof f.url !== 'string':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのfilesの値にurlが文字列でないものが含まれる)', f.url, it.files);
                             return true;
-                        case typeof d.filename !== 'string':
-                            console.error('ダウンロード用オブジェクトの型が不正(postsのitemsの値にfilenameが文字列でないものが含まれる)', d.filename, it.items);
+                        case typeof f.originalName !== 'string':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのfilesの値にoriginalNameが文字列でないものが含まれる)', f.originalName, it.files);
+                            return true;
+                        case typeof f.encodedName !== 'string':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのfilesの値にencodedNameが文字列でないものが含まれる)', f.encodedName, it.files);
                             return true;
                         case it.cover === undefined:
                             return false;
                         case typeof it.cover !== 'object':
                             console.error('ダウンロード用オブジェクトの型が不正(postsの値にcoverがobjectでないものが含まれる)', it.cover, target.posts);
                             return true;
-                        case typeof it.cover.url !== 'string':
-                            console.error('ダウンロード用オブジェクトの型が不正(postsのcoverの値にurlが文字列でないものが含まれる)', it.cover.url, it.cover);
+                        case typeof it.cover?.url !== 'string':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのcoverの値にurlが文字列でないものが含まれる)', it.cover?.url, it.cover);
                             return true;
-                        case typeof it.cover.filename !== 'string':
-                            console.error('ダウンロード用オブジェクトの型が不正(postsのcoverの値にfilenameが文字列でないものが含まれる)', it.cover.filename, it.cover);
+                        case typeof it.cover?.name !== 'string':
+                            console.error('ダウンロード用オブジェクトの型が不正(postsのcoverの値にnameが文字列でないものが含まれる)', it.cover?.name, it.cover);
                             return true;
                         default:
                             return false;
@@ -355,38 +625,40 @@ export class DownloadHelper {
      * 投稿一覧からルートのhtmlを作成する
      * @param posts 投稿一覧のオブジェクト
      */
-    createRootHtmlFromPosts(posts: Record<string, PostObj>): string {
-        return Object.entries(posts).map(([title, post]) => {
-            const escapedTitle = this.encodeFileName(title);
-            return `<a class="hl" href="${this.encodeLink('.', escapedTitle, 'index.html')}"><div class="root card">\n` +
-                this.createCoverHtmlFromPost(escapedTitle, post) +
-                `<div class="card-body"><h5 class="card-title">${title}</h5></div>\n</div></a><br>\n`
-        }).join('\n');
+    createRootHtmlFromPosts(posts: DownloadJsonObj['posts']): string {
+        return posts.map(post => `<a class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
+            this.createCoverHtmlFromPost(post) +
+            `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n`
+        ).join('\n');
     }
 
     /**
      * cover画像htmlの生成
      * カバー画像が無い場合は投稿画像をスライドショーする
-     * @param escapedTitle ファイル名エスケープされたフォルダタイトル
      * @param post 投稿情報オブジェクト
      */
-    createCoverHtmlFromPost(escapedTitle: string, post: PostObj): string {
+    createCoverHtmlFromPost(post: DownloadJsonObj['posts'][number]): string {
+        const postUri = `./${this.utils.encodeURI(post.encodedName)}/`;
         if (post.cover) {
-            return `<img class="card-img-top gray-card" src="${this.encodeLink('.', escapedTitle, post.cover.filename)}"/>\n`;
-        } else if (post.items.length > 0) {
+            return `<img class="card-img-top gray-card" src="${postUri}${this.utils.encodeURI(post.cover.name)}" alt="カバー画像"/>\n`;
+        }
+        const images = post.files.filter(file => file.encodedName.match(this.coverExt));
+        if (images.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
-                '\n<div class="carousel-item active">' + post.items.map(it =>
+                '\n<div class="carousel-item active">' +
+                images.map(img =>
                     '<div class="d-flex justify-content-center gray-carousel">' +
-                    `<img src="${this.encodeLink('.', escapedTitle, it.filename)}" class="d-block pd-carousel" height="180px"/></div>`
-                ).join('</div>\n<div class="carousel-item">') + '</div>\n</div></div>\n';
+                    `<img src="${postUri}${this.utils.encodeURI(img.encodedName)}" class="d-block pd-carousel" height="180px"/></div>`
+                ).join('</div>\n<div class="carousel-item">') +
+                '</div>\n</div></div>\n';
         } else {
-            return `<img class="card-img-top gray-card" />\n`;
+            return `<img class="card-img-top gray-card"/>\n`;
         }
     }
 
     /**
-     * bodyからhtmlを作成する
-     * @param title 投稿タイトル
+     * 投稿再現htmlの生成
+     * @param title 投稿
      * @param body
      */
     createHtmlFromBody(title: string, body: string): string {

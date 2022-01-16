@@ -5,6 +5,6 @@
 ## 使い方
 
 ```bash
-# yarn add git+https://github.com/furubarug/download-helper.git
-npm install --save git+https://github.com/furubarug/download-helper.git
+# yarn add git+https://github.com/furubarug/download-helper.git#release/2.0.0
+npm install --save git+https://github.com/furubarug/download-helper.git#release/2.0.0
 ```
