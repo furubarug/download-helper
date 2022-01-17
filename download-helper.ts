@@ -152,10 +152,7 @@ export class PostObject {
     }
 
     setCover(name: string, extension: string, url: string): FileObject {
-        const split = this.utils.splitExt(name);
-        const fileObj: FileObj = split.length <= 1 ?
-            {name, extension: "", url} :
-            {name: "cover", extension: split[1], url};
+        const fileObj: FileObj = {name, extension: extension ? `.${extension}` : "", url};
         this.postObj.cover = fileObj;
         return new FileObject(fileObj, this.utils);
     }
@@ -185,7 +182,8 @@ export class PostObject {
     private getCurrentFilePath(fileObject: FileObject): string {
         const encodedName = fileObject.getEncodedName();
         if (fileObject.equals(this.postObj.cover)) {
-            return `./${this.utils.encodeURI(encodedName)}`;
+            const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), 1, 1);
+            return `./${this.utils.encodeURI(fileName)}`;
         }
         if (this.postObj.files[encodedName] === undefined) {
             throw new Error(`file object is undefined: ${fileObject.getOriginalName()}`)
@@ -205,13 +203,17 @@ export class PostObject {
             throw new Error(`post object is not found: ${this.postObj.name}`);
         }
         const encodedName = this.utils.getFileName(key, "", posts[key].length, postIndex + 1);
+        const cover = this.postObj.cover ? {
+            url: this.postObj.cover.url,
+            name: this.utils.getFileName(this.postObj.cover.name, this.postObj.cover.extension, 1, 1)
+        } : undefined;
         return {
             originalName: this.postObj.name,
             encodedName,
             informationText: this.postObj.info,
             htmlText: this.postObj.html,
             files: this.collectFiles(),
-            cover: this.postObj.cover
+            cover
         };
     }
 
