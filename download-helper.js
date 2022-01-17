@@ -287,7 +287,11 @@ export class DownloadHelper {
                 .then(() => window.removeEventListener("beforeunload", loadingFun))
                 .catch((e) => {
                 textLog('エラー出た');
-                textLog(JSON.stringify(e));
+                if (typeof e.message == 'string') {
+                    textLog(e.message);
+                    console.error(e.message);
+                }
+                console.error(e);
                 window.removeEventListener("beforeunload", loadingFun);
             });
         };
@@ -401,7 +405,7 @@ export class DownloadHelper {
                 console.error('ダウンロード用オブジェクトの型が不正(postsが配列でない)', target.posts);
                 return false;
         }
-        return target.posts.some((it) => {
+        return !target.posts.some((it) => {
             switch (true) {
                 case typeof it !== 'object':
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にobjectでないものが含まれる)', it, target.posts);
