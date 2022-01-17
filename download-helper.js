@@ -18,17 +18,8 @@ export class DownloadUtils {
     splitExt(name) {
         return name.split(/(?=\.[^.]+$)/);
     }
-    getFileName(name, index) {
-        const split = this.splitExt(name);
-        if (split.length == 1) {
-            return `${index}${split[0]}`;
-        }
-        else if (split.length == 2) {
-            return `${split[0]}_${index}${split[1]}`;
-        }
-        else {
-            throw new Error(`unexpected name: ${name}`);
-        }
+    getFileName(name, extension, length, index) {
+        return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
     }
 }
 export class DownloadObject {
@@ -75,30 +66,31 @@ export class PostObject {
     setHtml(html) {
         this.postObj.html = html;
     }
-    setCover(name, url) {
+    setCover(name, extension, url) {
         const split = this.utils.splitExt(name);
-        const fileName = split.length <= 1 ? name : `cover${split[1]}`;
-        const fileObj = { name: fileName, url };
+        const fileObj = split.length <= 1 ?
+            { name, extension: "", url } :
+            { name: "cover", extension: split[1], url };
         this.postObj.cover = fileObj;
         return new FileObject(fileObj, this.utils);
     }
-    addFile(name, url) {
+    addFile(name, extension, url) {
         const encodedName = this.utils.encodeFileName(name);
         if (this.postObj.files[encodedName] === undefined) {
             this.postObj.files[encodedName] = [];
         }
-        const fileObj = { name, url };
+        const fileObj = { name, extension: extension ? `.${extension}` : "", url };
         this.postObj.files[encodedName].push(fileObj);
         return new FileObject(fileObj, this.utils);
     }
     getImageLinkTag(fileObject) {
         const filePath = this.getCurrentFilePath(fileObject);
-        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName()}"><div class="post card">\n` +
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
             `<img class="card-img-top" src="${filePath}" alt="${fileObject.getOriginalName()}"/>\n</div></a>`;
     }
     getFileLinkTag(fileObject) {
         const filePath = this.getCurrentFilePath(fileObject);
-        return `<span><a href="${filePath}" download="${fileObject.getEncodedName()}">${fileObject.getOriginalName()}</a></span>`;
+        return `<span><a href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">${fileObject.getOriginalName()}</a></span>`;
     }
     getCurrentFilePath(fileObject) {
         const encodedName = fileObject.getEncodedName();
@@ -112,7 +104,7 @@ export class PostObject {
         if (index < 0) {
             throw new Error(`file object is not found: ${fileObject.getOriginalName()}`);
         }
-        const fileName = this.postObj.files[encodedName].length == 1 ? encodedName : this.utils.getFileName(encodedName, index + 1);
+        const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), this.postObj.files[encodedName].length, index + 1);
         return `./${this.utils.encodeURI(fileName)}`;
     }
     toJsonObjBy(posts) {
@@ -122,7 +114,7 @@ export class PostObject {
         if (postIndex === undefined || postIndex < 0) {
             throw new Error(`post object is not found: ${this.postObj.name}`);
         }
-        const encodedName = posts[key].length == 1 ? key : this.utils.getFileName(key, postIndex + 1);
+        const encodedName = this.utils.getFileName(key, "", posts[key].length, postIndex + 1);
         return {
             originalName: this.postObj.name,
             encodedName,
@@ -138,7 +130,8 @@ export class PostObject {
             let fileIndex = 0;
             for (const fileObj of fileObjArray) {
                 fileIndex++;
-                const encodedName = fileObjArray.length == 1 ? key : this.utils.getFileName(key, fileIndex);
+                const extension = fileObj.extension ? this.utils.encodeFileName(fileObj.extension) : "";
+                const encodedName = this.utils.getFileName(key, extension, fileObjArray.length, fileIndex);
                 ret.push({
                     url: fileObj.url,
                     originalName: fileObj.name,
@@ -156,6 +149,9 @@ export class FileObject {
     }
     getEncodedName() {
         return this.utils.encodeFileName(this.fileObj.name);
+    }
+    getEncodedExtension() {
+        return this.fileObj.extension ? this.utils.encodeFileName(this.fileObj.extension) : "";
     }
     getOriginalName() {
         return this.fileObj.name;
@@ -315,7 +311,7 @@ export class DownloadHelper {
                 enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], 'index.html');
                 let postCount = 0;
                 for (const post of downloadObj.posts) {
-                    log(`${post.originalName} (${postCount++}/${downloadObj.postCount})`);
+                    log(`${post.originalName} (${++postCount}/${downloadObj.postCount})`);
                     enqueue([post.informationText], `${post.encodedName}/info.txt`);
                     enqueue([ui.createHtmlFromBody(post.originalName, post.htmlText)], `${post.encodedName}/index.html`);
                     if (post.cover) {
@@ -327,7 +323,7 @@ export class DownloadHelper {
                     }
                     let fileCount = 0;
                     for (const file of post.files) {
-                        log(`download ${file.encodedName} (${fileCount++}/${post.files.length})`);
+                        log(`download ${file.encodedName} (${++fileCount}/${post.files.length})`);
                         const blob = await ui.download({ url: file.url, name: file.encodedName }, 1);
                         if (blob) {
                             enqueue([blob], `${post.encodedName}/${file.encodedName}`);
