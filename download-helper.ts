@@ -35,6 +35,11 @@ export type DownloadJsonObj = {
  */
 export class DownloadUtils {
     /**
+     * カバー画像代替対象拡張子
+     */
+    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+
+    /**
      * 保存するファイル名のエンコード
      * 主にwindowsで使えないファイル名のエスケープ処理をする
      * @param name ファイル名
@@ -78,6 +83,14 @@ export class DownloadUtils {
      */
     getFileName(name: string, extension: string, length: number, index: number): string {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`
+    }
+
+    /**
+     * 画像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isImage(fileName: string): boolean {
+        return fileName.match(this.coverExt) != null;
     }
 
     /**
@@ -306,11 +319,6 @@ export class DownloadHelper {
         src: "https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js",
         integrity: "sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW",
     };
-
-    /**
-     * カバー画像代替対象拡張子
-     */
-    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
 
     /**
      * ダウンロード用のUIを作成する
@@ -649,7 +657,7 @@ export class DownloadHelper {
         if (post.cover) {
             return `<img class="card-img-top gray-card" src="${postUri}${this.utils.encodeURI(post.cover.name)}" alt="カバー画像"/>\n`;
         }
-        const images = post.files.filter(file => file.encodedName.match(this.coverExt));
+        const images = post.files.filter(file => this.utils.isImage(file.encodedName));
         if (images.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
                 '\n<div class="carousel-item active">' +

@@ -1,4 +1,7 @@
 export class DownloadUtils {
+    constructor() {
+        this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+    }
     encodeFileName(name) {
         return name
             .replace(/\//g, "／")
@@ -20,6 +23,9 @@ export class DownloadUtils {
     }
     getFileName(name, extension, length, index) {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
+    }
+    isImage(fileName) {
+        return fileName.match(this.coverExt) != null;
     }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -181,7 +187,6 @@ export class DownloadHelper {
             src: "https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js",
             integrity: "sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW",
         };
-        this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
         this.utils = utils;
     }
     async createDownloadUI(title) {
@@ -463,7 +468,7 @@ export class DownloadHelper {
         if (post.cover) {
             return `<img class="card-img-top gray-card" src="${postUri}${this.utils.encodeURI(post.cover.name)}" alt="カバー画像"/>\n`;
         }
-        const images = post.files.filter(file => file.encodedName.match(this.coverExt));
+        const images = post.files.filter(file => this.utils.isImage(file.encodedName));
         if (images.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
                 '\n<div class="carousel-item active">' +
