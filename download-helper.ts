@@ -35,6 +35,11 @@ export type DownloadJsonObj = {
  */
 export class DownloadUtils {
     /**
+     * カバー画像代替対象拡張子
+     */
+    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+
+    /**
      * 保存するファイル名のエンコード
      * 主にwindowsで使えないファイル名のエスケープ処理をする
      * @param name ファイル名
@@ -78,6 +83,22 @@ export class DownloadUtils {
      */
     getFileName(name: string, extension: string, length: number, index: number): string {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`
+    }
+
+    /**
+     * 画像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isImage(fileName: string): boolean {
+        return fileName.match(this.coverExt) != null;
+    }
+
+    /**
+     * timeoutによる疑似スリーブ
+     * @param ms ミリ秒
+     */
+    async sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
 
@@ -300,11 +321,6 @@ export class DownloadHelper {
     };
 
     /**
-     * カバー画像代替対象拡張子
-     */
-    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
-
-    /**
      * ダウンロード用のUIを作成する
      * @param title ダウンローダーの名前
      */
@@ -453,7 +469,7 @@ export class DownloadHelper {
         // @ts-ignore
         const readableZipStream = new createWriter({
             async pull(ctrl: any) {
-                const startTime = Math.floor(Date.now() / 60000);
+                const startTime = Math.floor(Date.now() / 1000);
                 let count = 0;
                 const enqueue = (fileBits: BlobPart[], path: string) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
@@ -487,13 +503,13 @@ export class DownloadHelper {
                         }
                         count++;
                         setTimeout(() => {
-                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 60000) - startTime) * (downloadObj.fileCount - count) / count);
-                            const h = remain / 60 | 0;
-                            const m = (remain - 60 * h) / 60 | 0;
+                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 1000) - startTime) * (downloadObj.fileCount - count) / count);
+                            const h = remain / (60 * 60) | 0;
+                            const m = (remain - 60 * 60 * h) / 60 | 0;
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
-                        await ui.sleep(100);
+                        await utils.sleep(100);
                     }
                 }
                 ctrl.close();
@@ -510,14 +526,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res: any) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-
-    /**
-     * timeoutによる疑似スリーブ
-     * @param ms ミリ秒
-     */
-    async sleep(ms: number) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     /**
@@ -551,7 +559,7 @@ export class DownloadHelper {
             return blob ? blob : await this.download({url, name}, limit - 1);
         } catch (_) {
             console.error(`通信エラー: ${name}, ${url}`);
-            await this.sleep(1000);
+            await this.utils.sleep(1000);
             return await this.download({url, name}, limit - 1);
         }
     }
@@ -649,7 +657,7 @@ export class DownloadHelper {
         if (post.cover) {
             return `<img class="card-img-top gray-card" src="${postUri}${this.utils.encodeURI(post.cover.name)}" alt="カバー画像"/>\n`;
         }
-        const images = post.files.filter(file => file.encodedName.match(this.coverExt));
+        const images = post.files.filter(file => this.utils.isImage(file.encodedName));
         if (images.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
                 '\n<div class="carousel-item active">' +

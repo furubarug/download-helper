@@ -1,4 +1,7 @@
 export class DownloadUtils {
+    constructor() {
+        this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+    }
     encodeFileName(name) {
         return name
             .replace(/\//g, "／")
@@ -20,6 +23,12 @@ export class DownloadUtils {
     }
     getFileName(name, extension, length, index) {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
+    }
+    isImage(fileName) {
+        return fileName.match(this.coverExt) != null;
+    }
+    async sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
 export class DownloadObject {
@@ -178,7 +187,6 @@ export class DownloadHelper {
             src: "https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js",
             integrity: "sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW",
         };
-        this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
         this.utils = utils;
     }
     async createDownloadUI(title) {
@@ -306,7 +314,7 @@ export class DownloadHelper {
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
         const readableZipStream = new createWriter({
             async pull(ctrl) {
-                const startTime = Math.floor(Date.now() / 60000);
+                const startTime = Math.floor(Date.now() / 1000);
                 let count = 0;
                 const enqueue = (fileBits, path) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
@@ -336,13 +344,13 @@ export class DownloadHelper {
                         }
                         count++;
                         setTimeout(() => {
-                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 60000) - startTime) * (downloadObj.fileCount - count) / count);
-                            const h = remain / 60 | 0;
-                            const m = (remain - 60 * h) / 60 | 0;
+                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 1000) - startTime) * (downloadObj.fileCount - count) / count);
+                            const h = remain / (60 * 60) | 0;
+                            const m = (remain - 60 * 60 * h) / 60 | 0;
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
-                        await ui.sleep(100);
+                        await utils.sleep(100);
                     }
                 }
                 ctrl.close();
@@ -355,9 +363,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-    async sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
     async script(url) {
         return new Promise((resolve, reject) => {
@@ -381,7 +386,7 @@ export class DownloadHelper {
         }
         catch (_) {
             console.error(`通信エラー: ${name}, ${url}`);
-            await this.sleep(1000);
+            await this.utils.sleep(1000);
             return await this.download({ url, name }, limit - 1);
         }
     }
@@ -463,7 +468,7 @@ export class DownloadHelper {
         if (post.cover) {
             return `<img class="card-img-top gray-card" src="${postUri}${this.utils.encodeURI(post.cover.name)}" alt="カバー画像"/>\n`;
         }
-        const images = post.files.filter(file => file.encodedName.match(this.coverExt));
+        const images = post.files.filter(file => this.utils.isImage(file.encodedName));
         if (images.length > 0) {
             return '<div class="carousel slide" data-bs-ride="carousel" data-interval="1000"><div class="carousel-inner">' +
                 '\n<div class="carousel-item active">' +
