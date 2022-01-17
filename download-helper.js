@@ -306,7 +306,7 @@ export class DownloadHelper {
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
         const readableZipStream = new createWriter({
             async pull(ctrl) {
-                const startTime = Math.floor(Date.now() / 60000);
+                const startTime = Math.floor(Date.now() / 1000);
                 let count = 0;
                 const enqueue = (fileBits, path) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
@@ -336,9 +336,9 @@ export class DownloadHelper {
                         }
                         count++;
                         setTimeout(() => {
-                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 60000) - startTime) * (downloadObj.fileCount - count) / count);
-                            const h = remain / 60 | 0;
-                            const m = (remain - 60 * h) / 60 | 0;
+                            const remain = Math.floor(Math.abs(Math.floor(Date.now() / 1000) - startTime) * (downloadObj.fileCount - count) / count);
+                            const h = remain / (60 * 60) | 0;
+                            const m = (remain - 60 * 60 * h) / 60 | 0;
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);

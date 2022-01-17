@@ -1,6 +1,6 @@
 {
   "name": "download-helper",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "ブックマークレットとかで使うUI",
   "scripts": {
     "build": "tsc"
