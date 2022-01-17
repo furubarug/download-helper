@@ -79,6 +79,14 @@ export class DownloadUtils {
     getFileName(name: string, extension: string, length: number, index: number): string {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`
     }
+
+    /**
+     * timeoutによる疑似スリーブ
+     * @param ms ミリ秒
+     */
+    async sleep(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 }
 
 /**
@@ -493,7 +501,7 @@ export class DownloadHelper {
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
-                        await ui.sleep(100);
+                        await utils.sleep(100);
                     }
                 }
                 ctrl.close();
@@ -510,14 +518,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res: any) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-
-    /**
-     * timeoutによる疑似スリーブ
-     * @param ms ミリ秒
-     */
-    async sleep(ms: number) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
     /**
@@ -551,7 +551,7 @@ export class DownloadHelper {
             return blob ? blob : await this.download({url, name}, limit - 1);
         } catch (_) {
             console.error(`通信エラー: ${name}, ${url}`);
-            await this.sleep(1000);
+            await this.utils.sleep(1000);
             return await this.download({url, name}, limit - 1);
         }
     }

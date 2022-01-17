@@ -21,6 +21,9 @@ export class DownloadUtils {
     getFileName(name, extension, length, index) {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
     }
+    async sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
 }
 export class DownloadObject {
     constructor(id, utils) {
@@ -342,7 +345,7 @@ export class DownloadHelper {
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
-                        await ui.sleep(100);
+                        await utils.sleep(100);
                     }
                 }
                 ctrl.close();
@@ -355,9 +358,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-    async sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
     }
     async script(url) {
         return new Promise((resolve, reject) => {
@@ -381,7 +381,7 @@ export class DownloadHelper {
         }
         catch (_) {
             console.error(`通信エラー: ${name}, ${url}`);
-            await this.sleep(1000);
+            await this.utils.sleep(1000);
             return await this.download({ url, name }, limit - 1);
         }
     }
