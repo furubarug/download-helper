@@ -2,6 +2,13 @@ export class DownloadUtils {
     constructor() {
         this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
     }
+    httpGetAs(url) {
+        const request = new XMLHttpRequest();
+        request.open('GET', url, false);
+        request.withCredentials = true;
+        request.send(null);
+        return JSON.parse(request.responseText);
+    }
     encodeFileName(name) {
         return name
             .replace(/\//g, "／")
@@ -29,6 +36,32 @@ export class DownloadUtils {
     }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    async fetchWithLimit({ url, name }, limit) {
+        if (limit < 0)
+            return null;
+        try {
+            const blob = await fetch(url)
+                .catch(e => {
+                throw new Error(e);
+            })
+                .then(r => r.ok ? r.blob() : null);
+            return blob ? blob : await this.fetchWithLimit({ url, name }, limit - 1);
+        }
+        catch (_) {
+            console.error(`通信エラー: ${name}, ${url}`);
+            await this.sleep(1000);
+            return await this.fetchWithLimit({ url, name }, limit - 1);
+        }
+    }
+    async embedScript(url) {
+        return new Promise((resolve, reject) => {
+            let script = document.createElement("script");
+            script.src = url;
+            script.onload = () => resolve(script);
+            script.onerror = (e) => reject(e);
+            document.head.appendChild(script);
+        });
     }
 }
 export class DownloadObject {
@@ -305,11 +338,11 @@ export class DownloadHelper {
     async downloadZip(downloadObj, progress, log, remainTime) {
         if (!this.isDownloadJsonObj(downloadObj))
             throw new Error('ダウンロード対象オブジェクトの型が不正');
-        await this.script('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
-        await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
-        await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
         const ui = this;
         const utils = this.utils;
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
         const encodedId = utils.encodeFileName(downloadObj.id);
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
         const readableZipStream = new createWriter({
@@ -326,7 +359,7 @@ export class DownloadHelper {
                     enqueue([ui.createHtmlFromBody(post.originalName, post.htmlText)], `${post.encodedName}/index.html`);
                     if (post.cover) {
                         log(`download ${post.cover.name}`);
-                        const blob = await ui.download(post.cover, 1);
+                        const blob = await utils.fetchWithLimit(post.cover, 1);
                         if (blob) {
                             enqueue([blob], `${post.encodedName}/${post.cover.name}`);
                         }
@@ -334,7 +367,7 @@ export class DownloadHelper {
                     let fileCount = 0;
                     for (const file of post.files) {
                         log(`download ${file.encodedName} (${++fileCount}/${post.files.length})`);
-                        const blob = await ui.download({ url: file.url, name: file.encodedName }, 1);
+                        const blob = await utils.fetchWithLimit({ url: file.url, name: file.encodedName }, 1);
                         if (blob) {
                             enqueue([blob], `${post.encodedName}/${file.encodedName}`);
                         }
@@ -363,32 +396,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-    async script(url) {
-        return new Promise((resolve, reject) => {
-            let script = document.createElement("script");
-            script.src = url;
-            script.onload = () => resolve(script);
-            script.onerror = (e) => reject(e);
-            document.head.appendChild(script);
-        });
-    }
-    async download({ url, name }, limit) {
-        if (limit < 0)
-            return null;
-        try {
-            const blob = await fetch(url)
-                .catch(e => {
-                throw new Error(e);
-            })
-                .then(r => r.ok ? r.blob() : null);
-            return blob ? blob : await this.download({ url, name }, limit - 1);
-        }
-        catch (_) {
-            console.error(`通信エラー: ${name}, ${url}`);
-            await this.utils.sleep(1000);
-            return await this.download({ url, name }, limit - 1);
-        }
     }
     isDownloadJsonObj(target) {
         switch (true) {
