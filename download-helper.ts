@@ -35,9 +35,55 @@ export type DownloadJsonObj = {
  */
 export class DownloadUtils {
     /**
-     * カバー画像代替対象拡張子
+     * 音声拡張子
      */
-    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+    audioExtension = /\.(mp3|m4a|ogg)$/;
+
+    /**
+     * 画像拡張子
+     */
+    imageExtension = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+
+    /**
+     * 映像拡張子
+     */
+    videoExtension = /\.(mp4|webm|ogv)$/;
+
+    /**
+     * 音声ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isAudio(fileName: string): boolean {
+        return fileName.match(this.audioExtension) != null;
+    }
+
+    /**
+     * 画像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isImage(fileName: string): boolean {
+        return fileName.match(this.imageExtension) != null;
+    }
+
+    /**
+     * 映像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isVideo(fileName: string): boolean {
+        return fileName.match(this.videoExtension) != null;
+    }
+
+    /**
+     * HTTP GET
+     * @param url
+     */
+    httpGetAs<T = any>(url: string): T {
+        const request = new XMLHttpRequest();
+        request.open('GET', url, false);
+        request.withCredentials = true;
+        request.send(null);
+        return JSON.parse(request.responseText) as T;
+    }
 
     /**
      * 保存するファイル名のエンコード
@@ -86,19 +132,47 @@ export class DownloadUtils {
     }
 
     /**
-     * 画像ファイル判定
-     * @param fileName 判定対象ファイル名
-     */
-    isImage(fileName: string): boolean {
-        return fileName.match(this.coverExt) != null;
-    }
-
-    /**
      * timeoutによる疑似スリーブ
      * @param ms ミリ秒
      */
     async sleep(ms: number) {
         return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    /**
+     * リトライ回数付きfetch
+     * @param url
+     * @param filename
+     * @param limit 失敗時のリトライ回数
+     */
+    async fetchWithLimit({url, name}: { url: string, name: string }, limit: number): Promise<Blob | null> {
+        if (limit < 0) return null;
+        try {
+            const blob = await fetch(url)
+                .catch(e => {
+                    throw new Error(e)
+                })
+                .then(r => r.ok ? r.blob() : null);
+            return blob ? blob : await this.fetchWithLimit({url, name}, limit - 1);
+        } catch (_) {
+            console.error(`通信エラー: ${name}, ${url}`);
+            await this.sleep(1000);
+            return await this.fetchWithLimit({url, name}, limit - 1);
+        }
+    }
+
+    /**
+     * DOMによる外部スクリプト読み込み (importじゃだめなとき用)
+     * @param url
+     */
+    async embedScript(url: string) {
+        return new Promise((resolve, reject) => {
+            let script = document.createElement("script");
+            script.src = url;
+            script.onload = () => resolve(script);
+            script.onerror = (e) => reject(e);
+            document.head.appendChild(script);
+        });
     }
 }
 
@@ -188,6 +262,36 @@ export class PostObject {
         return new FileObject(fileObj, this.utils);
     }
 
+    getAutoAssignedLinkTag(fileObject: FileObject): string {
+        const ext = fileObject.getEncodedExtension();
+        switch (true) {
+            case this.utils.isAudio(ext):
+                return this.getAudioLinkTag(fileObject);
+            case this.utils.isImage(ext):
+                return this.getImageLinkTag(fileObject);
+            case this.utils.isVideo(ext):
+                return this.getVideoLinkTag(fileObject);
+            default:
+                return this.getFileLinkTag(fileObject);
+        }
+    }
+
+    getAudioLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<div class="card-header">${fileObject.getOriginalName()}</div>\n` +
+            `<audio class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
+    }
+
+    getFileLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">` +
+            `<div class="post card text-center"><p class="pt-2">\n` +
+            `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">\n` +
+            `<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>\n` +
+            `<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>\n` +
+            `</svg>${fileObject.getOriginalName()}</p></div></a>`;
+    }
 
     getImageLinkTag(fileObject: FileObject): string {
         const filePath = this.getCurrentFilePath(fileObject);
@@ -195,9 +299,10 @@ export class PostObject {
             `<img class="card-img-top" src="${filePath}" alt="${fileObject.getOriginalName()}"/>\n</div></a>`;
     }
 
-    getFileLinkTag(fileObject: FileObject): string {
+    getVideoLinkTag(fileObject: FileObject): string {
         const filePath = this.getCurrentFilePath(fileObject);
-        return `<span><a href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">${fileObject.getOriginalName()}</a></span>`;
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<video class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
     }
 
     private getCurrentFilePath(fileObject: FileObject): string {
@@ -457,12 +562,11 @@ export class DownloadHelper {
      */
     async downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void, remainTime: (r: string) => void) {
         if (!this.isDownloadJsonObj(downloadObj)) throw new Error('ダウンロード対象オブジェクトの型が不正');
-        await this.script('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
-        await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
-        await this.script('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
-
         const ui = this;
         const utils = this.utils;
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
         const encodedId = utils.encodeFileName(downloadObj.id);
         // @ts-ignore
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
@@ -485,7 +589,7 @@ export class DownloadHelper {
                     // カバー画像
                     if (post.cover) {
                         log(`download ${post.cover.name}`);
-                        const blob = await ui.download(post.cover, 1);
+                        const blob = await utils.fetchWithLimit(post.cover, 1);
                         if (blob) {
                             enqueue([blob], `${post.encodedName}/${post.cover.name}`);
                         }
@@ -494,7 +598,7 @@ export class DownloadHelper {
                     let fileCount = 0;
                     for (const file of post.files) {
                         log(`download ${file.encodedName} (${++fileCount}/${post.files.length})`);
-                        const blob = await ui.download({url: file.url, name: file.encodedName}, 1);
+                        const blob = await utils.fetchWithLimit({url: file.url, name: file.encodedName}, 1);
                         if (blob) {
                             enqueue([blob], `${post.encodedName}/${file.encodedName}`);
                         } else {
@@ -505,7 +609,7 @@ export class DownloadHelper {
                         setTimeout(() => {
                             const remain = Math.floor(Math.abs(Math.floor(Date.now() / 1000) - startTime) * (downloadObj.fileCount - count) / count);
                             const h = remain / (60 * 60) | 0;
-                            const m = (remain - 60 * 60 * h) / 60 | 0;
+                            const m = Math.ceil((remain - 60 * 60 * h) / 60);
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
@@ -526,42 +630,6 @@ export class DownloadHelper {
         const reader = readableZipStream.getReader();
         const pump = () => reader.read().then((res: any) => res.done ? writer.close() : writer.write(res.value).then(pump));
         await pump();
-    }
-
-    /**
-     * DOMによる外部スクリプト読み込み (importじゃだめなとき用)
-     * @param url
-     */
-    async script(url: string) {
-        return new Promise((resolve, reject) => {
-            let script = document.createElement("script");
-            script.src = url;
-            script.onload = () => resolve(script);
-            script.onerror = (e) => reject(e);
-            document.head.appendChild(script);
-        });
-    }
-
-    /**
-     * fetch
-     * @param url
-     * @param filename
-     * @param limit 回数制限
-     */
-    async download({url, name}: { url: string, name: string }, limit: number): Promise<Blob | null> {
-        if (limit < 0) return null;
-        try {
-            const blob = await fetch(url)
-                .catch(e => {
-                    throw new Error(e)
-                })
-                .then(r => r.ok ? r.blob() : null);
-            return blob ? blob : await this.download({url, name}, limit - 1);
-        } catch (_) {
-            console.error(`通信エラー: ${name}, ${url}`);
-            await this.utils.sleep(1000);
-            return await this.download({url, name}, limit - 1);
-        }
     }
 
     /**
