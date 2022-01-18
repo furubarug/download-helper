@@ -1,6 +1,17 @@
 export class DownloadUtils {
     constructor() {
-        this.coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+        this.audioExtension = /\.(mp3|m4a|ogg)$/;
+        this.imageExtension = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+        this.videoExtension = /\.(mp4|webm|ogv)$/;
+    }
+    isAudio(fileName) {
+        return fileName.match(this.audioExtension) != null;
+    }
+    isImage(fileName) {
+        return fileName.match(this.imageExtension) != null;
+    }
+    isVideo(fileName) {
+        return fileName.match(this.videoExtension) != null;
     }
     httpGetAs(url) {
         const request = new XMLHttpRequest();
@@ -30,9 +41,6 @@ export class DownloadUtils {
     }
     getFileName(name, extension, length, index) {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
-    }
-    isImage(fileName) {
-        return fileName.match(this.coverExt) != null;
     }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -122,14 +130,43 @@ export class PostObject {
         this.postObj.files[encodedName].push(fileObj);
         return new FileObject(fileObj, this.utils);
     }
+    getAutoAssignedLinkTag(fileObject) {
+        const ext = fileObject.getEncodedExtension();
+        switch (true) {
+            case this.utils.isAudio(ext):
+                return this.getAudioLinkTag(fileObject);
+            case this.utils.isImage(ext):
+                return this.getImageLinkTag(fileObject);
+            case this.utils.isVideo(ext):
+                return this.getVideoLinkTag(fileObject);
+            default:
+                return this.getFileLinkTag(fileObject);
+        }
+    }
+    getAudioLinkTag(fileObject) {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<div class="card-header">${fileObject.getOriginalName()}</div>\n` +
+            `<audio class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
+    }
+    getFileLinkTag(fileObject) {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">` +
+            `<div class="post card text-center"><p class="pt-2">\n` +
+            `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">\n` +
+            `<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>\n` +
+            `<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>\n` +
+            `</svg>${fileObject.getOriginalName()}</p></div></a>`;
+    }
     getImageLinkTag(fileObject) {
         const filePath = this.getCurrentFilePath(fileObject);
         return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
             `<img class="card-img-top" src="${filePath}" alt="${fileObject.getOriginalName()}"/>\n</div></a>`;
     }
-    getFileLinkTag(fileObject) {
+    getVideoLinkTag(fileObject) {
         const filePath = this.getCurrentFilePath(fileObject);
-        return `<span><a href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">${fileObject.getOriginalName()}</a></span>`;
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<video class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
     }
     getCurrentFilePath(fileObject) {
         const encodedName = fileObject.getEncodedName();

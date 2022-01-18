@@ -35,9 +35,43 @@ export type DownloadJsonObj = {
  */
 export class DownloadUtils {
     /**
-     * カバー画像代替対象拡張子
+     * 音声拡張子
      */
-    coverExt = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+    audioExtension = /\.(mp3|m4a|ogg)$/;
+
+    /**
+     * 画像拡張子
+     */
+    imageExtension = /\.(apng|avif|gif|jpg|jpeg|jfif|pjpeg|pjp|png|svg|webp)$/;
+
+    /**
+     * 映像拡張子
+     */
+    videoExtension = /\.(mp4|webm|ogv)$/;
+
+    /**
+     * 音声ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isAudio(fileName: string): boolean {
+        return fileName.match(this.audioExtension) != null;
+    }
+
+    /**
+     * 画像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isImage(fileName: string): boolean {
+        return fileName.match(this.imageExtension) != null;
+    }
+
+    /**
+     * 映像ファイル判定
+     * @param fileName 判定対象ファイル名
+     */
+    isVideo(fileName: string): boolean {
+        return fileName.match(this.videoExtension) != null;
+    }
 
     /**
      * HTTP GET
@@ -95,14 +129,6 @@ export class DownloadUtils {
      */
     getFileName(name: string, extension: string, length: number, index: number): string {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`
-    }
-
-    /**
-     * 画像ファイル判定
-     * @param fileName 判定対象ファイル名
-     */
-    isImage(fileName: string): boolean {
-        return fileName.match(this.coverExt) != null;
     }
 
     /**
@@ -236,6 +262,36 @@ export class PostObject {
         return new FileObject(fileObj, this.utils);
     }
 
+    getAutoAssignedLinkTag(fileObject: FileObject): string {
+        const ext = fileObject.getEncodedExtension();
+        switch (true) {
+            case this.utils.isAudio(ext):
+                return this.getAudioLinkTag(fileObject);
+            case this.utils.isImage(ext):
+                return this.getImageLinkTag(fileObject);
+            case this.utils.isVideo(ext):
+                return this.getVideoLinkTag(fileObject);
+            default:
+                return this.getFileLinkTag(fileObject);
+        }
+    }
+
+    getAudioLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<div class="card-header">${fileObject.getOriginalName()}</div>\n` +
+            `<audio class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
+    }
+
+    getFileLinkTag(fileObject: FileObject): string {
+        const filePath = this.getCurrentFilePath(fileObject);
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">` +
+            `<div class="post card text-center"><p class="pt-2">\n` +
+            `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">\n` +
+            `<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>\n` +
+            `<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>\n` +
+            `</svg>${fileObject.getOriginalName()}</p></div></a>`;
+    }
 
     getImageLinkTag(fileObject: FileObject): string {
         const filePath = this.getCurrentFilePath(fileObject);
@@ -243,9 +299,10 @@ export class PostObject {
             `<img class="card-img-top" src="${filePath}" alt="${fileObject.getOriginalName()}"/>\n</div></a>`;
     }
 
-    getFileLinkTag(fileObject: FileObject): string {
+    getVideoLinkTag(fileObject: FileObject): string {
         const filePath = this.getCurrentFilePath(fileObject);
-        return `<span><a href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}">${fileObject.getOriginalName()}</a></span>`;
+        return `<a class="hl" href="${filePath}" download="${fileObject.getEncodedName() + fileObject.getEncodedExtension()}"><div class="post card">\n` +
+            `<video class="card-img-top" src="${filePath}" controls/>\n</div></a>`;
     }
 
     private getCurrentFilePath(fileObject: FileObject): string {
