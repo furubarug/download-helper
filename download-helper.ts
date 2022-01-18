@@ -609,7 +609,7 @@ export class DownloadHelper {
                         setTimeout(() => {
                             const remain = Math.floor(Math.abs(Math.floor(Date.now() / 1000) - startTime) * (downloadObj.fileCount - count) / count);
                             const h = remain / (60 * 60) | 0;
-                            const m = (remain - 60 * 60 * h) / 60 | 0;
+                            const m = Math.ceil((remain - 60 * 60 * h) / 60);
                             remainTime(`${h}:${('00' + m).slice(-2)}`);
                             progress(count * 100 / downloadObj.fileCount | 0);
                         }, 0);
