@@ -533,23 +533,20 @@ export class DownloadHelper {
         bootScript.integrity = this.bootJS.integrity;
         bootScript.crossOrigin = "anonymous";
         document.body.appendChild(bootScript);
-        const loadingFun = ((event: BeforeUnloadEvent) => event.returnValue = `downloading`);
         const downloadFun = this.downloadZip.bind(this);
 
-        button.onclick = function () {
+        button.onclick = async () => {
             button.disabled = true;
+            const loadingFun = ((event: BeforeUnloadEvent) => event.returnValue = `downloading`);
             window.addEventListener('beforeunload', loadingFun);
-            downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime)
-                .then(() => window.removeEventListener("beforeunload", loadingFun))
-                .catch((e) => {
-                    textLog('エラー出た');
-                    if (typeof e.message == 'string') {
-                        textLog(e.message);
-                        console.error(e.message);
-                    }
-                    console.error(e);
-                    window.removeEventListener("beforeunload", loadingFun);
-                });
+            try {
+                await downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime);
+            } catch (e) {
+                textLog('エラー出た');
+                console.error(e);
+            } finally {
+                window.removeEventListener("beforeunload", loadingFun);
+            }
         };
     }
 
