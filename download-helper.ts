@@ -290,7 +290,7 @@ export class PostObject {
             `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">\n` +
             `<path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>\n` +
             `<path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>\n` +
-            `</svg>${fileObject.getOriginalName()}</p></div></a>`;
+            `</svg> ${fileObject.getOriginalName() + fileObject.getOriginalExtension()}</p></div></a>`;
     }
 
     getImageLinkTag(fileObject: FileObject): string {
@@ -380,11 +380,15 @@ export class FileObject {
     }
 
     getEncodedExtension(): string {
-        return this.fileObj.extension ? this.utils.encodeFileName(this.fileObj.extension) : "";
+        return this.utils.encodeFileName(this.fileObj.extension);
     }
 
     getOriginalName(): string {
         return this.fileObj.name;
+    }
+
+    getOriginalExtension(): string {
+        return this.fileObj.extension;
     }
 
     getUrl(): string {
@@ -533,23 +537,20 @@ export class DownloadHelper {
         bootScript.integrity = this.bootJS.integrity;
         bootScript.crossOrigin = "anonymous";
         document.body.appendChild(bootScript);
-        const loadingFun = ((event: BeforeUnloadEvent) => event.returnValue = `downloading`);
         const downloadFun = this.downloadZip.bind(this);
 
-        button.onclick = function () {
+        button.onclick = async () => {
             button.disabled = true;
+            const loadingFun = ((event: BeforeUnloadEvent) => event.returnValue = `downloading`);
             window.addEventListener('beforeunload', loadingFun);
-            downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime)
-                .then(() => window.removeEventListener("beforeunload", loadingFun))
-                .catch((e) => {
-                    textLog('エラー出た');
-                    if (typeof e.message == 'string') {
-                        textLog(e.message);
-                        console.error(e.message);
-                    }
-                    console.error(e);
-                    window.removeEventListener("beforeunload", loadingFun);
-                });
+            try {
+                await downloadFun(JSON.parse(input.value), setProgress, textLog, setRemainTime);
+            } catch (e) {
+                textLog('エラー出た');
+                console.error(e);
+            } finally {
+                window.removeEventListener("beforeunload", loadingFun);
+            }
         };
     }
 
