@@ -1,6 +1,6 @@
 {
   "name": "download-helper",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "ブックマークレットとかで使うUI",
   "scripts": {
     "build": "tsc"
@@ -11,12 +11,12 @@
   },
   "author": "furubarug",
   "license": "MIT",
-  "main": "download-helper.js",
-  "types": "download-helper.d.ts",
+  "main": "dist/download-helper.js",
+  "types": "dist/download-helper.d.ts",
   "files": [
-    "download-helper.js",
-    "download-helper.d.ts",
-    "download-helper.d.ts.map"
+    "dist/download-helper.js",
+    "dist/download-helper.d.ts",
+    "dist/download-helper.d.ts.map"
   ],
   "bugs": {
     "url": "https://github.com/furubarug/download/issues"
