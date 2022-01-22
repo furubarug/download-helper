@@ -569,11 +569,10 @@ export class DownloadHelper {
         await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
         await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
         const encodedId = utils.encodeFileName(downloadObj.id);
-        // @ts-ignore
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
-        // @ts-ignore
+
         const readableZipStream = new createWriter({
-            async pull(ctrl: any) {
+            async pull(ctrl) {
                 const startTime = Math.floor(Date.now() / 1000);
                 let count = 0;
                 const enqueue = (fileBits: BlobPart[], path: string) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
@@ -629,7 +628,9 @@ export class DownloadHelper {
         // less optimized
         const writer = fileStream.getWriter();
         const reader = readableZipStream.getReader();
-        const pump = () => reader.read().then((res: any) => res.done ? writer.close() : writer.write(res.value).then(pump));
+        const pump: () => Promise<void> = () => reader.read().then((res: any) =>
+            res.done ? writer.close() : writer.write(res.value).then(pump)
+        );
         await pump();
     }
 
