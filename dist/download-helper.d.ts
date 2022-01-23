@@ -7,6 +7,7 @@ export declare type PostObj = {
     info: string;
     files: Record<string, FileObj[]>;
     html: string;
+    tags: string[];
     cover?: FileObj;
 };
 export declare type FileObj = {
@@ -25,12 +26,15 @@ export declare type DownloadJsonObj = {
             originalName: string;
             encodedName: string;
         }[];
+        tags: string[];
         cover?: {
             url: string;
             name: string;
         };
     }[];
     id: string;
+    url: string;
+    tags: string[];
     fileCount: number;
     postCount: number;
 };
@@ -57,11 +61,16 @@ export declare class DownloadObject {
     private readonly downloadObj;
     private readonly utils;
     private readonly orderedPosts;
+    private url;
+    private tags;
     constructor(id: string, utils: DownloadUtils);
     stringify(): string;
+    setUrl(url: string): void;
+    setTags(tags: string[]): void;
     addPost(name: string): PostObject;
     private countPost;
     private countFile;
+    private collectTags;
 }
 export declare class PostObject {
     private readonly postObj;
@@ -69,6 +78,7 @@ export declare class PostObject {
     constructor(postObj: PostObj, utils: DownloadUtils);
     setInfo(info: string): void;
     setHtml(html: string): void;
+    setTags(tags: string[]): void;
     setCover(name: string, extension: string, url: string): FileObject;
     addFile(name: string, extension: string, url: string): FileObject;
     getAutoAssignedLinkTag(fileObject: FileObject): string;
@@ -102,10 +112,13 @@ export declare class DownloadHelper {
         src: string;
         integrity: string;
     };
+    vueJS: {
+        src: string;
+    };
     createDownloadUI(title: string): Promise<void>;
     downloadZip(downloadObj: any, progress: (n: number) => void, log: (s: string) => void, remainTime: (r: string) => void): Promise<void>;
     isDownloadJsonObj(target: any): target is DownloadJsonObj;
-    createRootHtmlFromPosts(posts: DownloadJsonObj['posts']): string;
+    createRootHtmlFromPosts(downloadObj: DownloadJsonObj): string;
     createCoverHtmlFromPost(post: DownloadJsonObj['posts'][number]): string;
     createHtmlFromBody(title: string, body: string): string;
 }

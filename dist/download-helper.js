@@ -75,24 +75,34 @@ export class DownloadUtils {
 export class DownloadObject {
     constructor(id, utils) {
         this.orderedPosts = [];
+        this.url = "#main";
         this.downloadObj = { posts: {}, id };
         this.utils = utils;
     }
     stringify() {
+        var _a;
         const downloadJson = {
             posts: this.orderedPosts.map(it => it.toJsonObjBy(this.downloadObj.posts)),
             id: this.downloadObj.id,
+            url: this.url,
+            tags: (_a = this.tags) !== null && _a !== void 0 ? _a : this.collectTags(),
             postCount: this.countPost(),
             fileCount: this.countFile()
         };
         return JSON.stringify(downloadJson);
+    }
+    setUrl(url) {
+        this.url = url;
+    }
+    setTags(tags) {
+        this.tags = tags;
     }
     addPost(name) {
         const encodedName = this.utils.encodeFileName(name);
         if (this.downloadObj.posts[encodedName] === undefined) {
             this.downloadObj.posts[encodedName] = [];
         }
-        const postObj = { name, info: '', files: {}, html: '' };
+        const postObj = { name, info: '', files: {}, html: '', tags: [] };
         this.downloadObj.posts[encodedName].push(postObj);
         const postObject = new PostObject(postObj, this.utils);
         this.orderedPosts.push(postObject);
@@ -103,6 +113,11 @@ export class DownloadObject {
     }
     countFile() {
         return Object.values(this.downloadObj.posts).reduce((allFileSize, posts) => allFileSize + posts.reduce((postFileSize, post) => postFileSize + Object.values(post.files).reduce((s, files) => s + files.length, 0), 0), 0);
+    }
+    collectTags() {
+        const tags = new Set();
+        Object.values(this.downloadObj.posts).forEach(posts => posts.forEach(post => post.tags.forEach(tag => tags.add(tag))));
+        return [...tags];
     }
 }
 export class PostObject {
@@ -115,6 +130,9 @@ export class PostObject {
     }
     setHtml(html) {
         this.postObj.html = html;
+    }
+    setTags(tags) {
+        this.postObj.tags = tags;
     }
     setCover(name, extension, url) {
         const fileObj = { name, extension: extension ? `.${extension}` : "", url };
@@ -202,6 +220,7 @@ export class PostObject {
             informationText: this.postObj.info,
             htmlText: this.postObj.html,
             files: this.collectFiles(),
+            tags: this.postObj.tags,
             cover
         };
     }
@@ -259,6 +278,9 @@ export class DownloadHelper {
         this.bootJS = {
             src: "https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js",
             integrity: "sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW",
+        };
+        this.vueJS = {
+            src: "https://unpkg.com/vue@3.2.28/dist/vue.global.js",
         };
         this.utils = utils;
     }
@@ -390,7 +412,7 @@ export class DownloadHelper {
                 let count = 0;
                 const enqueue = (fileBits, path) => ctrl.enqueue(new File(fileBits, `${encodedId}/${path}`));
                 log(`@${downloadObj.id} 投稿:${downloadObj.postCount} ファイル:${downloadObj.fileCount}`);
-                enqueue([ui.createHtmlFromBody(downloadObj.id, ui.createRootHtmlFromPosts(downloadObj.posts))], 'index.html');
+                enqueue([ui.createRootHtmlFromPosts(downloadObj)], 'index.html');
                 let postCount = 0;
                 for (const post of downloadObj.posts) {
                     log(`${post.originalName} (${++postCount}/${downloadObj.postCount})`);
@@ -453,6 +475,9 @@ export class DownloadHelper {
             case !Array.isArray(target.posts):
                 console.error('ダウンロード用オブジェクトの型が不正(postsが配列でない)', target.posts);
                 return false;
+            case !Array.isArray(target.tags):
+                console.error('ダウンロード用オブジェクトの型が不正(tagsが配列でない)', target.tags);
+                return false;
         }
         return !target.posts.some((it) => {
             switch (true) {
@@ -465,8 +490,14 @@ export class DownloadHelper {
                 case typeof it.htmlText !== 'string':
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にhtmlTextが文字列でないものが含まれる)', it.htmlText, target.posts);
                     return true;
+                case typeof it.url !== 'string':
+                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にurlが文字列でないものが含まれる)', it.url, target.posts);
+                    return true;
                 case !Array.isArray(it.files):
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にfilesが配列でないものが含まれる)', it.files, target.posts);
+                    return true;
+                case !Array.isArray(it.tags):
+                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にtagsが配列でないものが含まれる)', it.tags, target.posts);
                     return true;
                 case it.files.some((f) => {
                     var _a, _b, _c, _d;
@@ -504,10 +535,42 @@ export class DownloadHelper {
             }
         });
     }
-    createRootHtmlFromPosts(posts) {
-        return posts.map(post => `<a class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
-            this.createCoverHtmlFromPost(post) +
-            `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n`).join('\n');
+    createRootHtmlFromPosts(downloadObj) {
+        const header = `<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="utf-8" />\n<title>${downloadObj.id}</title>\n` +
+            `<link href="${this.bootCSS.href}" rel="stylesheet" integrity="${this.bootCSS.integrity}" crossOrigin="anonymous">\n` +
+            '<style>div.main{width: 600px; float: none; margin: 65px auto 0}div.root{width: 400px}div.post{width: 600px}' +
+            'a.hl,a.hl:hover{color: inherit;text-decoration: none;}div.card{float: none; margin: 0 auto;}' +
+            'img.gray-card{height: 210px;background-color: gray;}' +
+            'div.gray-carousel{height: 210px; width: 400px;background-color: gray;}' +
+            'img.pd-carousel{height: 210px; padding: 15px;}</style>\n' +
+            `</head>\n<body>\n<div class="main" id="main">\n`;
+        const body = `<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top"><div class="container-fluid">\n` +
+            `<a class="navbar-brand" href="${downloadObj.url}">${downloadObj.id}</a>\n` +
+            `<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#dd" aria-controls="dd" aria-expanded="false" aria-label="Toggle navigation">\n` +
+            `<span class="navbar-toggler-icon"></span>\n` +
+            `</button>\n` +
+            `<div class="collapse navbar-collapse" id="dd"><ul class="navbar-nav">\n` +
+            `<li class="nav-item dropdown">\n` +
+            `<a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">Tags</a>\n` +
+            `<ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dd">\n` +
+            `<li v-for="(tag,i) in [${downloadObj.tags.map(tag => `'${tag}'`).join(",")}]">\n` +
+            ` <div class="form-check mx-1">\n` +
+            `<input class="form-check-input" type="checkbox" v-model="selected" :value="tag" :id="'box'+(i+1)">\n` +
+            `<label class="form-check-label" :for="'box'+(i+1)">{{tag}}</label>\n` +
+            `</div>\n</li>\n` +
+            `</ul>\n</li>\n</ul></div>\n</div></nav>\n\n` +
+            downloadObj.posts.map(post => `<a v-if="isVisible([${post.tags.map(tag => `'${tag}'`).join(", ")}], selected)" ` +
+                `class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
+                this.createCoverHtmlFromPost(post) +
+                `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n`).join('\n');
+        const footer = `\n</div>\n` +
+            `<script src="${this.vueJS}"></script>\n` +
+            `<script>\nVue.createApp({\ndata() {return { selected: [] }},` +
+            `methods: {\n isVisible(tags, selected) {\n  if (!selected.length) return true\n  return tags.some(it => selected.includes(it))\n }\n}\n` +
+            `}).mount('#main')\n</script>\n` +
+            `<script src="${this.bootJS.src}" integrity="${this.bootJS.integrity}" crossOrigin="anonymous"></script>\n` +
+            '</body></html>';
+        return header + body + footer;
     }
     createCoverHtmlFromPost(post) {
         const postUri = `./${this.utils.encodeURI(post.encodedName)}/`;
