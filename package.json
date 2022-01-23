@@ -11,12 +11,11 @@
   },
   "author": "furubarug",
   "license": "MIT",
-  "main": "dist/download-helper.js",
-  "types": "dist/download-helper.d.ts",
+  "main": "download-helper.js",
+  "types": "download-helper.ts",
   "files": [
-    "dist/download-helper.js",
-    "dist/download-helper.d.ts",
-    "dist/download-helper.d.ts.map"
+    "download-helper.js",
+    "download-helper.ts"
   ],
   "bugs": {
     "url": "https://github.com/furubarug/download/issues"
