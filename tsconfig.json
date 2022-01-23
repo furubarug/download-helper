@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es2017",
     "module": "es2015",
-    "outDir": "dist",
+    "outDir": "./",
     "removeComments": true,
     "strict": true,
     "lib": [
@@ -11,11 +11,10 @@
     ],
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true
+    "forceConsistentCasingInFileNames": true
   },
   "exclude": [
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "dist/**/*"
   ]
 }
