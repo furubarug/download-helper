@@ -790,7 +790,7 @@ export class DownloadHelper {
         const footer = `\n</div>\n` +
             `<script src="${this.vueJS.src}"></script>\n` +
             `<script>\nVue.createApp({\ndata() {return { selected: [] }},` +
-            `methods: {\n isVisible(tags, selected) {\n  if (!selected.length) return true\n  return tags.some(it => selected.includes(it))\n }\n}\n` +
+            `methods: {\n isVisible(tags, selected) {\n  if (!selected.length) return true\n  return selected.every(it => tags.includes(it))\n }\n}\n` +
             `}).mount('#main')\n</script>\n` +
             `<script src="${this.bootJS.src}" integrity="${this.bootJS.integrity}" crossOrigin="anonymous"></script>\n` +
             '</body></html>';
