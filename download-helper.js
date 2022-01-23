@@ -472,6 +472,9 @@ export class DownloadHelper {
             case typeof target.id !== 'string':
                 console.error('ダウンロード用オブジェクトの型が不正(idが文字列でない)', target.id);
                 return false;
+            case typeof target.url !== 'string':
+                console.error('ダウンロード用オブジェクトの型が不正(urlが文字列でない)', target.url);
+                return false;
             case !Array.isArray(target.posts):
                 console.error('ダウンロード用オブジェクトの型が不正(postsが配列でない)', target.posts);
                 return false;
@@ -489,9 +492,6 @@ export class DownloadHelper {
                     return true;
                 case typeof it.htmlText !== 'string':
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にhtmlTextが文字列でないものが含まれる)', it.htmlText, target.posts);
-                    return true;
-                case typeof it.url !== 'string':
-                    console.error('ダウンロード用オブジェクトの型が不正(postsの値にurlが文字列でないものが含まれる)', it.url, target.posts);
                     return true;
                 case !Array.isArray(it.files):
                     console.error('ダウンロード用オブジェクトの型が不正(postsの値にfilesが配列でないものが含まれる)', it.files, target.posts);
@@ -564,7 +564,7 @@ export class DownloadHelper {
                 this.createCoverHtmlFromPost(post) +
                 `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n`).join('\n');
         const footer = `\n</div>\n` +
-            `<script src="${this.vueJS}"></script>\n` +
+            `<script src="${this.vueJS.src}"></script>\n` +
             `<script>\nVue.createApp({\ndata() {return { selected: [] }},` +
             `methods: {\n isVisible(tags, selected) {\n  if (!selected.length) return true\n  return tags.some(it => selected.includes(it))\n }\n}\n` +
             `}).mount('#main')\n</script>\n` +
