@@ -566,10 +566,10 @@ export class DownloadHelper {
             `<label class="form-check-label" :for="'box'+(i+1)">{{tag}}</label>\n` +
             `</div>\n</li>\n` +
             `</ul>\n</li>\n</ul></div>\n</div></nav>\n\n` +
-            downloadObj.posts.map(post => `<a v-if="isVisible([${post.tags.map(tag => `'${tag}'`).join(", ")}], selected)" ` +
-                `class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
+            downloadObj.posts.map(post => `<div v-if="isVisible([${post.tags.map(tag => `'${tag}'`).join(", ")}], selected)">\n` +
+                `<a class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
                 this.createCoverHtmlFromPost(post) +
-                `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n`).join('\n');
+                `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n</div>\n`).join('\n');
         const footer = `\n</div>\n` +
             `<script src="${this.vueJS.src}"></script>\n` +
             `<script>\nVue.createApp({\ndata() {return { selected: [] }},` +
