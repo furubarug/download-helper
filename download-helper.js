@@ -42,6 +42,9 @@ export class DownloadUtils {
     getFileName(name, extension, length, index) {
         return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
     }
+    toQuoted(value) {
+        return `'${value.replaceAll('\'', '\\\'')}'`;
+    }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -560,13 +563,13 @@ export class DownloadHelper {
             `<li class="nav-item dropdown">\n` +
             `<a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">Tags</a>\n` +
             `<ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dd">\n` +
-            `<li v-for="(tag,i) in [${downloadObj.tags.map(tag => `'${tag}'`).join(",")}]">\n` +
+            `<li v-for="(tag,i) in [${downloadObj.tags.map(tag => this.utils.toQuoted(tag)).join(",")}]">\n` +
             ` <div class="form-check mx-1">\n` +
             `<input class="form-check-input" type="checkbox" v-model="selected" :value="tag" :id="'box'+(i+1)">\n` +
             `<label class="form-check-label" :for="'box'+(i+1)">{{tag}}</label>\n` +
             `</div>\n</li>\n` +
             `</ul>\n</li>\n</ul></div>\n</div></nav>\n\n` +
-            downloadObj.posts.map(post => `<div v-if="isVisible([${post.tags.map(tag => `'${tag}'`).join(", ")}], selected)">\n` +
+            downloadObj.posts.map(post => `<div v-show="isVisible([${post.tags.map(tag => this.utils.toQuoted(tag)).join(", ")}], selected)">\n` +
                 `<a class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
                 this.createCoverHtmlFromPost(post) +
                 `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n</div>\n`).join('\n');
