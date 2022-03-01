@@ -39,8 +39,13 @@ export class DownloadUtils {
     splitExt(name) {
         return name.split(/(?=\.[^.]+$)/);
     }
-    getFileName(name, extension, length, index) {
-        return length <= 1 ? `${name}${extension}` : `${name}_${index}${extension}`;
+    getFileName(name, extension, length, index, isAsc) {
+        if (length <= 1)
+            return `${name}${extension}`;
+        return isAsc ? `${name}_${index + 1}${extension}` : `${name}_${length - index}${extension}`;
+    }
+    toQuoted(value) {
+        return `'${value.replaceAll('\'', '\\\'')}'`;
     }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -196,7 +201,7 @@ export class PostObject {
     getCurrentFilePath(fileObject) {
         const encodedName = fileObject.getEncodedName();
         if (fileObject.equals(this.postObj.cover)) {
-            const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), 1, 1);
+            const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), 1, 0, true);
             return `./${this.utils.encodeURI(fileName)}`;
         }
         if (this.postObj.files[encodedName] === undefined) {
@@ -206,7 +211,7 @@ export class PostObject {
         if (index < 0) {
             throw new Error(`file object is not found: ${fileObject.getOriginalName()}`);
         }
-        const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), this.postObj.files[encodedName].length, index + 1);
+        const fileName = this.utils.getFileName(encodedName, fileObject.getEncodedExtension(), this.postObj.files[encodedName].length, index, true);
         return `./${this.utils.encodeURI(fileName)}`;
     }
     toJsonObjBy(posts) {
@@ -216,10 +221,10 @@ export class PostObject {
         if (postIndex === undefined || postIndex < 0) {
             throw new Error(`post object is not found: ${this.postObj.name}`);
         }
-        const encodedName = this.utils.getFileName(key, "", posts[key].length, postIndex + 1);
+        const encodedName = this.utils.getFileName(key, "", posts[key].length, postIndex, false);
         const cover = this.postObj.cover ? {
             url: this.postObj.cover.url,
-            name: this.utils.getFileName(this.postObj.cover.name, this.postObj.cover.extension, 1, 1)
+            name: this.utils.getFileName(this.postObj.cover.name, this.postObj.cover.extension, 1, 0, true)
         } : undefined;
         return {
             originalName: this.postObj.name,
@@ -236,9 +241,8 @@ export class PostObject {
         for (const [key, fileObjArray] of Object.entries(this.postObj.files)) {
             let fileIndex = 0;
             for (const fileObj of fileObjArray) {
-                fileIndex++;
                 const extension = fileObj.extension ? this.utils.encodeFileName(fileObj.extension) : "";
-                const encodedName = this.utils.getFileName(key, extension, fileObjArray.length, fileIndex);
+                const encodedName = this.utils.getFileName(key, extension, fileObjArray.length, fileIndex++, true);
                 ret.push({
                     url: fileObj.url,
                     originalName: fileObj.name,
@@ -560,13 +564,13 @@ export class DownloadHelper {
             `<li class="nav-item dropdown">\n` +
             `<a class="nav-link dropdown-toggle" href="#" id="navbarDarkDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">Tags</a>\n` +
             `<ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dd">\n` +
-            `<li v-for="(tag,i) in [${downloadObj.tags.map(tag => `'${tag}'`).join(",")}]">\n` +
+            `<li v-for="(tag,i) in [${downloadObj.tags.map(tag => this.utils.toQuoted(tag)).join(",")}]">\n` +
             ` <div class="form-check mx-1">\n` +
             `<input class="form-check-input" type="checkbox" v-model="selected" :value="tag" :id="'box'+(i+1)">\n` +
             `<label class="form-check-label" :for="'box'+(i+1)">{{tag}}</label>\n` +
             `</div>\n</li>\n` +
             `</ul>\n</li>\n</ul></div>\n</div></nav>\n\n` +
-            downloadObj.posts.map(post => `<div v-if="isVisible([${post.tags.map(tag => `'${tag}'`).join(", ")}], selected)">\n` +
+            downloadObj.posts.map(post => `<div v-show="isVisible([${post.tags.map(tag => this.utils.toQuoted(tag)).join(", ")}], selected)">\n` +
                 `<a class="hl" href="./${this.utils.encodeURI(post.encodedName)}/index.html"><div class="root card">\n` +
                 this.createCoverHtmlFromPost(post) +
                 `<div class="card-body"><h5 class="card-title">${post.originalName}</h5></div>\n</div></a><br>\n</div>\n`).join('\n');
