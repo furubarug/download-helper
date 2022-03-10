@@ -47,6 +47,15 @@ export class DownloadUtils {
     toQuoted(value) {
         return `'${value.replaceAll('\'', '\\\'')}'`;
     }
+    createInformationFile(informationText) {
+        try {
+            const json = JSON.stringify(JSON.parse(informationText), null, "\t");
+            return { name: 'info.json', content: [json] };
+        }
+        catch (e) {
+            return { name: 'info.txt', content: [informationText] };
+        }
+    }
     async sleep(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -427,7 +436,8 @@ export class DownloadHelper {
                 let postCount = 0;
                 for (const post of downloadObj.posts) {
                     log(`${post.originalName} (${++postCount}/${downloadObj.postCount})`);
-                    enqueue([post.informationText], `${post.encodedName}/info.txt`);
+                    const informationFile = utils.createInformationFile(post.informationText);
+                    enqueue(informationFile.content, `${post.encodedName}/${utils.encodeFileName(informationFile.name)}`);
                     enqueue([ui.createHtmlFromBody(post.originalName, post.htmlText)], `${post.encodedName}/index.html`);
                     if (post.cover) {
                         log(`download ${post.cover.name}`);

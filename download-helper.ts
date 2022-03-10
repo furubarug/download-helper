@@ -145,6 +145,20 @@ export class DownloadUtils {
     }
 
     /**
+     * テキストから投稿情報ファイルを作成する
+     * @param informationText 元となるテキスト
+     * @return name ファイル名, content ファイル内容
+     */
+    createInformationFile(informationText: string): { name: string, content: BlobPart[] } {
+        try {
+            const json = JSON.stringify(JSON.parse(informationText), null, "\t");
+            return {name: 'info.json', content: [json]};
+        } catch (e) {
+            return {name: 'info.txt', content: [informationText]};
+        }
+    }
+
+    /**
      * timeoutによる疑似スリーブ
      * @param ms ミリ秒
      */
@@ -640,7 +654,8 @@ export class DownloadHelper {
                 for (const post of downloadObj.posts) {
                     log(`${post.originalName} (${++postCount}/${downloadObj.postCount})`);
                     // 投稿情報+html
-                    enqueue([post.informationText], `${post.encodedName}/info.txt`);
+                    const informationFile = utils.createInformationFile(post.informationText);
+                    enqueue(informationFile.content, `${post.encodedName}/${utils.encodeFileName(informationFile.name)}`);
                     enqueue([ui.createHtmlFromBody(post.originalName, post.htmlText)], `${post.encodedName}/index.html`);
                     // カバー画像
                     if (post.cover) {
