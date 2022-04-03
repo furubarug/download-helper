@@ -104,7 +104,7 @@ export class DownloadUtils {
             .replace(/</g, "＜")
             .replace(/>/g, "＞")
             .replace(/\|/g, "｜")
-            .trimEnd();
+            .trim();
     }
 
     /**
