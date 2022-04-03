@@ -31,7 +31,7 @@ export class DownloadUtils {
             .replace(/</g, "＜")
             .replace(/>/g, "＞")
             .replace(/\|/g, "｜")
-            .trimEnd();
+            .trim();
     }
     encodeURI(name) {
         return this.encodeFileName(name).replaceAll(/[;,/?:@&=+$#]/g, encodeURIComponent);
