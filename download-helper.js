@@ -422,8 +422,8 @@ export class DownloadHelper {
         const ui = this;
         const utils = this.utils;
         await utils.embedScript('https://cdn.jsdelivr.net/npm/web-streams-polyfill@2.0.2/dist/ponyfill.min.js');
-        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/StreamSaver.js');
-        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.3/examples/zip-stream.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/StreamSaver.js');
+        await utils.embedScript('https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/examples/zip-stream.js');
         const encodedId = utils.encodeFileName(downloadObj.id);
         const fileStream = streamSaver.createWriteStream(`${encodedId}.zip`);
         const readableZipStream = new createWriter({
